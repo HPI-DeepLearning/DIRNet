@@ -34,10 +34,16 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
         # TO DO: the original authors use exponential linear units as activation
         body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
         body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
-
-    # Nicht sicher ob loc einfach der output vom convnet regressor ist.
-    # Ich vermute man muss die  anzahl filter und kernel sizes so anpassen dass das irgendwie zusammen passt
-    body = mx.sym.SpatialTransformer(data=data_moving, loc=body)
+        #
+        flatten = mx.sym.flatten(data=body)
+        fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=6) # Todo: Initialize as identity
+    # The Spatial Transformer performs a affine transformation to the moving image,
+    # parametrized by the output of the body network
+    stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=image_shape, type='Affine',
+                                     sampler_type="bilinear", name='SpatialTransformer')
+    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet, )
+    stnet = mx.sym.MakeLoss(cor, normalization='batch')
+    return stnet
 
 def get_symbol(image_shape):
     return conv_net_regressor(image_shape)
