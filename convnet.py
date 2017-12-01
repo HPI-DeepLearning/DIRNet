@@ -28,7 +28,7 @@ def get_mnist(mnistdir='/data/'):
             'test_data': test_img, 'test_label': test_lbl}
 
 
-def get_mnist_data_iterator(mnistdir='./data/', digit=1):
+def get_mnist_data_iterator_w_labels(mnistdir='./data/', digit=1):
     def get_iterator_single_digit(data, label):
         one_digit_indices = []  # Contains all indices with images depicting the digit
         for index in range(len(label)):  # There might be a faster way to do this
@@ -43,6 +43,29 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
 
         iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
                                  [one_digit_label, one_digit_label],
+                                 batch_size=1, shuffle=True)
+        return iterator
+
+    mnist = get_mnist(mnistdir)
+    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
+    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
+    return train_iter, val_iter
+
+
+def get_mnist_data_iterator(mnistdir='./data/', digit=1):
+    def get_iterator_single_digit(data, label):
+        one_digit_indices = []  # Contains all indices with images depicting the digit
+        for index in range(len(label)):  # There might be a faster way to do this
+            if label[index] == digit:
+                one_digit_indices.append(index)
+        one_digit_data = data[one_digit_indices]
+        one_digit_label = label[one_digit_indices]
+        fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
+        one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
+        for _ in one_digit_data:
+            one_digit_fixed_image.append(fixed_image)
+
+        iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
                                  batch_size=1, shuffle=True)
         return iterator
 
@@ -104,7 +127,7 @@ if __name__ == '__main__':
     mnist_shape = (1,28,28)
     iterators = get_mnist_data_iterator()
     model = mx.mod.Module(symbol=get_symbol(mnist_shape), context=mx.gpu(),
-                          label_names= ,data_names=['data_fixed', 'data_moving'])
+                          label_names=None, data_names=['data_fixed', 'data_moving'])
     model.fit(iterators[0],  # eval_data=val_iter,
                     optimizer='sgd',
                     optimizer_params={'learning_rate': 0.1},
