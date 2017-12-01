@@ -32,12 +32,13 @@ fc2 = mx.sym.FullyConnected(data=tanh3, num_hidden=10)
 #lenet = mx.sym.SoftmaxOutput(data=fc2, name='softmax')
 
 label = mx.sym.var('label')
-correlation=mx.symbol.Correlation(data,data)
-correlation_output = mx.sym.BlockGrad(data = correlation,name = 'correlation')
-ce = -mx.sym.sum(mx.sym.broadcast_mul(fc2,label),1)
+softmax = mx.sym.log_softmax(data=fc2)
+softmax_output = mx.sym.BlockGrad(data = softmax,name = 'softmax')
+ce = ce = -mx.sym.sum(mx.sym.sum(mx.sym.broadcast_mul(softmax,label),1))
 lenet = mx.symbol.MakeLoss(ce, normalization='batch')
 
 sym = mx.sym.Group([softmax_output,lenet])
+print (sym.list_outputs)
 
 def custom_metric(label,softmax):
     return len(np.where(np.argmax(softmax,1)==np.argmax(label,1))[0])/float(label.shape[0])
