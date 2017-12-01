@@ -64,9 +64,8 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
         one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
         for _ in one_digit_data:
             one_digit_fixed_image.append(fixed_image)
-
-        iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
-                                 batch_size=1, shuffle=True)
+        data = {'data_fixed': one_digit_fixed_image, 'data_moving': one_digit_data}
+        iterator = mx.io.NDArrayIter(data, batch_size=1, shuffle=True)
         return iterator
 
     mnist = get_mnist(mnistdir)
@@ -124,7 +123,7 @@ def get_symbol(image_shape):
 
 
 if __name__ == '__main__':
-    mnist_shape = (1,28,28)
+    mnist_shape = (1, 28, 28)
     iterators = get_mnist_data_iterator()
     model = mx.mod.Module(symbol=get_symbol(mnist_shape), context=mx.gpu(),
                           label_names=None, data_names=['data_fixed', 'data_moving'])
