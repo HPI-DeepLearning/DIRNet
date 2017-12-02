@@ -12,7 +12,7 @@ import struct
 import CustomNDArrayIter as customIter
 
 
-def get_mnist(mnistdir='/data/'):
+def get_mnist(mnistdir='./data/'):
     def read_data(label_url, image_url):
         with gzip.open(label_url) as flbl:
             struct.unpack(">II", flbl.read(8))
@@ -133,6 +133,13 @@ if __name__ == '__main__':
     model.fit(iterators[0],  # eval_data=val_iter,
                     optimizer='sgd',
                     optimizer_params={'learning_rate': 0.1},
-                    eval_metric=mx.metric.Loss(),#'acc',
-                    #batch_end_callback = mx.callback.Speedometer(batch_size, 100),
+                    eval_metric=mx.metric.Loss(),
                     num_epoch=10)
+    # NOTE!
+    # to get this to work right now with mxnet v. 0.12.1
+    # You have to add the following lines at the beginning of the in update_metric function in executor_group.py!
+    #
+    # if self.label_layouts == None and self.label_names == None:
+    #     # special case: We train without labels
+    #     eval_metric.update_dict({}, {})
+    #     return

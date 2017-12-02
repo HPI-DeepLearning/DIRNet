@@ -3,8 +3,30 @@ import logging
 logging.getLogger().setLevel(logging.DEBUG)
 import mxnet as mx
 import numpy as np
+import gzip
+import struct
 
-mnist = mx.test_utils.get_mnist()
+
+def get_mnist(mnistdir='./data/'):
+    def read_data(label_url, image_url):
+        with gzip.open(label_url) as flbl:
+            struct.unpack(">II", flbl.read(8))
+            label = np.fromstring(flbl.read(), dtype=np.int8)
+        with gzip.open(image_url, 'rb') as fimg:
+            _, _, rows, cols = struct.unpack(">IIII", fimg.read(16))
+            image = np.fromstring(fimg.read(), dtype=np.uint8).reshape(len(label), rows, cols)
+            image = image.reshape(image.shape[0], 1, 28, 28).astype(np.float32) / 255
+        return label, image
+
+    (train_lbl, train_img) = read_data(
+        mnistdir + 'train-labels-idx1-ubyte.gz', mnistdir + 'train-images-idx3-ubyte.gz')
+    (test_lbl, test_img) = read_data(
+        mnistdir + 't10k-labels-idx1-ubyte.gz', mnistdir + 't10k-images-idx3-ubyte.gz')
+    return {'train_data': train_img, 'train_label': train_lbl,
+            'test_data': test_img, 'test_label': test_lbl}
+
+
+mnist = get_mnist()
 
 batch_size = 100
 weighted_train_labels = np.zeros((mnist['train_label'].shape[0], np.max(mnist['train_label']) + 1))
@@ -36,7 +58,7 @@ fc2 = mx.sym.FullyConnected(data=tanh3, num_hidden=10)
 label = mx.sym.var('label')
 softmax = mx.sym.log_softmax(data=fc2)
 softmax_output = mx.sym.BlockGrad(data=softmax, name='softmax')
-ce = ce = -mx.sym.sum(mx.sym.sum(mx.sym.broadcast_mul(softmax, label), 1))
+ce = -mx.sym.sum(mx.sym.sum(mx.sym.broadcast_mul(softmax, label), 1))
 lenet = mx.symbol.MakeLoss(ce, normalization='batch')
 
 sym = mx.sym.Group([softmax_output, lenet])
@@ -55,6 +77,6 @@ lenet_model.fit(train_iter,
                 eval_data=val_iter,
                 optimizer='sgd',
                 optimizer_params={'learning_rate': 0.1},
-                eval_metric=eval_metrics,  # mx.metric.Loss(),#'acc',
+                eval_metric=mx.metric.Loss(),#'acc',
                 # batch_end_callback = mx.callback.Speedometer(batch_size, 100),
                 num_epoch=10)
