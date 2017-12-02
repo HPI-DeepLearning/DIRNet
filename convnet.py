@@ -115,8 +115,7 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     # parametrized by the output of the body network
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=image_shape, transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
-    Y = mx.symbol.Variable('lin_reg_label')
-    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet)
+    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet) # Todo: This doesnt work. I think it does not comput _normalized_ cross corr.
     stnet = mx.sym.MakeLoss(cor, normalization='batch')
     return stnet
 
@@ -128,8 +127,12 @@ def get_symbol(image_shape):
 if __name__ == '__main__':
     mnist_shape = (1, 28, 28)
     iterators = get_mnist_data_iterator()
-    model = mx.mod.Module(symbol=get_symbol(mnist_shape), context=mx.cpu(),
+    net = get_symbol(mnist_shape)
+    model = mx.mod.Module(symbol=net, context=mx.cpu(),
                           label_names=None, data_names=['data_fixed', 'data_moving'])
+    # a = mx.viz.plot_network(net)
+    # a.render()
+
     model.fit(iterators[0],  # eval_data=val_iter,
                     optimizer='sgd',
                     optimizer_params={'learning_rate': 0.1},
