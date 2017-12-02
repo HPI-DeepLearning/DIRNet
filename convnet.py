@@ -7,6 +7,7 @@ import mxnet as mx
 import numpy as np
 import gzip
 import struct
+import CustomNDArrayIter as customIter
 
 
 def get_mnist(mnistdir='/data/'):
@@ -65,7 +66,7 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
         for _ in one_digit_data:
             one_digit_fixed_image.append(fixed_image)
         data = {'data_fixed': one_digit_fixed_image, 'data_moving': one_digit_data}
-        iterator = mx.io.NDArrayIter(data, batch_size=1, shuffle=True)
+        iterator = customIter.NDArrayIter(data, batch_size=1, shuffle=True)
         return iterator
 
     mnist = get_mnist(mnistdir)
