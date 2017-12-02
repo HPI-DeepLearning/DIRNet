@@ -50,7 +50,7 @@ def custom_metric(label, softmax):
 eval_metrics = mx.metric.CustomMetric(custom_metric, name='custom-accuracy', output_names=['softmax_output'],
                                       label_names=['label'])
 
-lenet_model = mx.mod.Module(symbol=sym, context=mx.gpu(), data_names=['data'], label_names=['label'])
+lenet_model = mx.mod.Module(symbol=sym, context=mx.cpu(), data_names=['data'], label_names=['label'])
 lenet_model.fit(train_iter,
                 eval_data=val_iter,
                 optimizer='sgd',

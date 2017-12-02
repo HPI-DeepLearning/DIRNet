@@ -2,7 +2,9 @@
 Implementation of the following paper:
 https://arxiv.org/abs/1704.06065
 '''
+import logging
 
+logging.getLogger().setLevel(logging.DEBUG)
 import mxnet as mx
 import numpy as np
 import gzip
@@ -88,10 +90,10 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     # four alternating layers of 3 × 3 convolutions with 0-padding and 2 × 2 downsampling layers
     for i in range(4):
         if i == 0:
-            body = mx.sym.Convolution(data=batched, num_filter=filter_list[i], kernel=(3, 3), stride=(2, 2), pad=(0, 0),
+            body = mx.sym.Convolution(data=batched, num_filter=filter_list[i], kernel=(3, 3), stride=(1, 1), pad=(0, 0),
                                       no_bias=True, name="conv" + str(i))
         else:
-            body = mx.sym.Convolution(data=body, num_filter=filter_list[i], kernel=(3, 3), stride=(2, 2), pad=(0, 0),
+            body = mx.sym.Convolution(data=body, num_filter=filter_list[i], kernel=(3, 3), stride=(1, 1), pad=(0, 0),
                                       no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
         # TO DO: the original authors use exponential linear units as activation
@@ -126,11 +128,11 @@ def get_symbol(image_shape):
 if __name__ == '__main__':
     mnist_shape = (1, 28, 28)
     iterators = get_mnist_data_iterator()
-    model = mx.mod.Module(symbol=get_symbol(mnist_shape), context=mx.gpu(),
+    model = mx.mod.Module(symbol=get_symbol(mnist_shape), context=mx.cpu(),
                           label_names=None, data_names=['data_fixed', 'data_moving'])
     model.fit(iterators[0],  # eval_data=val_iter,
                     optimizer='sgd',
                     optimizer_params={'learning_rate': 0.1},
-                    #eval_metric=eval_metrics,#mx.metric.Loss(),#'acc',
+                    eval_metric=mx.metric.Loss(),#'acc',
                     #batch_end_callback = mx.callback.Speedometer(batch_size, 100),
                     num_epoch=10)
