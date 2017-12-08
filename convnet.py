@@ -10,6 +10,7 @@ import numpy as np
 import gzip
 import struct
 import CustomNDArrayIter as customIter
+from collections import OrderedDict
 
 
 def get_mnist(mnistdir='./data/'):
@@ -45,8 +46,8 @@ def get_mnist_data_iterator_w_labels(mnistdir='./data/', digit=1):
             one_digit_fixed_image.append(fixed_image)
 
         iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
-                                 [one_digit_label, one_digit_label],
-                                 batch_size=1, shuffle=True)
+                                     [one_digit_label, one_digit_label],
+                                     batch_size=1, shuffle=True)
         return iterator
 
     mnist = get_mnist(mnistdir)
@@ -115,29 +116,149 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     # parametrized by the output of the body network
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=image_shape, transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
-    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet) # Todo: This doesnt work. I think it does not comput _normalized_ cross corr.
-    stnet = mx.sym.MakeLoss(cor, normalization='batch')
-    return stnet
+    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet)
+    loss = mx.sym.MakeLoss(cor, normalization='batch')
+    output = mx.sym.Group([mx.sym.BlockGrad(cor), loss])
+    return output
 
 
 def get_symbol(image_shape):
     return conv_net_regressor(image_shape)
 
 
+def debug_symbol(sym):
+    '''Get internals values for blobs (forward only).'''
+    args = sym.list_arguments()
+    output_names = []  # sym.list_outputs()
+
+    sym = sym.get_internals()
+    blob_names = sym.list_outputs()
+    sym_group = []
+    for i in range(len(blob_names)):
+        if blob_names[i] not in args:
+            x = sym[i]
+            if blob_names[i] not in output_names:
+                x = mx.symbol.BlockGrad(x, name=blob_names[i])
+            sym_group.append(x)
+    sym = mx.symbol.Group(sym_group)
+    return sym
+
+
+def custom_training_simple_bind(symbol, train_iter):
+    '''
+    Our own training method for the network. using the low-level simple_bind API
+    Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
+    :param symbol:
+    :param train_iter:
+    :return:
+    '''
+
+    # helper function
+    def Init(key, arr):
+        if "weight" in key:
+            arr[:] = mx.random.uniform(-0.07, 0.07, arr.shape)
+            # or
+            # arr[:] = np.random.uniform(-0.07, 0.07, arr.shape)
+        elif "gamma" in key:
+            # for batch norm slope
+            arr[:] = 1.0
+        elif "bias" in key:
+            arr[:] = 0
+        elif "beta" in key:
+            # for batch norm bias
+            arr[:] = 0
+
+    def customSGD(key, weight, grad, lr=0.1, grad_norm=1):
+        # key is key for weight, we can customize update rule
+        # weight is weight array
+        # grad is grad array
+        # lr is learning rate
+        # grad_norm is scalar to norm gradient, usually it is batch_size
+        norm = 1.0 / grad_norm
+        # here we can bias' learning rate 2 times larger than weight
+        if "weight" in key or "gamma" in key:
+            weight[:] -= lr * (grad * norm)
+        elif "bias" in key or "beta" in key:
+            weight[:] -= 2.0 * lr * (grad * norm)
+        else:
+            pass
+
+    # this should work, but it doesnt
+    # shape = train_iter.provide_data#[0][1]  # gives us the data shape of one of the 2 data sources. Both have same shape
+    # executor = symbol.simple_bind(ctx=mx.cpu(), data_shapes=shape, label_shapes=None)
+
+    # luckily, this works
+    executor = symbol.simple_bind(ctx=mx.cpu(), data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
+                                  label_shapes=None)
+
+    # get argument arrays
+    arg_arrays = executor.arg_arrays
+    # get grad arrays
+    grad_arrays = executor.grad_arrays
+    # get aux_states arrays. Note: currently only BatchNorm symbol has auxiliary states, which is moving_mean and moving_var
+    aux_arrays = executor.aux_arrays
+    # get outputs from executor
+    output_arrays = executor.outputs
+    # The sequence of arrays is in same sequence of symbol arguments
+    args = dict(zip(symbol.list_arguments(), arg_arrays))  # dict containing parameter names and values (i think)
+    grads = dict(zip(symbol.list_arguments(), grad_arrays))
+    outputs = dict(zip(symbol.list_outputs(), output_arrays))
+    aux_states = dict(zip(symbol.list_auxiliary_states(), aux_arrays))
+
+    # initialize parameters by uniform random numbers
+    for key, arr in args.items():
+        Init(key, arr)
+    keys = symbol.list_arguments()
+    # train 5 epochs, i.e. going over the data iter one pass
+    for epoch in range(5):
+        train_iter.reset()
+        for batch in train_iter:
+            outs = executor.forward(is_train=True, data_fixed=batch.data[0], data_moving=batch.data[1])
+            cor1 = executor.outputs[0]
+            grad1 = executor.outputs[1]
+            grad = executor.backward()  # compute gradients
+            for key in keys:  # update parameters
+                customSGD(key, args[key], grads[key])
+            print('Epoch %d, Training cor %s grad %s' % (epoch, cor1, grad1))
+
+
+def custom_training(mod, train_iter):
+    shape = train_iter.provide_data  # [0][1]  # gives us the data shape of one of the 2 data sources. Both have same shape
+    mod.bind(data_shapes=shape, label_shapes=None)
+    # initialize parameters by uniform random numbers
+    mod.init_params(initializer=mx.init.Uniform(scale=.1))
+    # use SGD with learning rate 0.1 to train
+    mod.init_optimizer(optimizer='sgd', optimizer_params=(('learning_rate', 0.1),))
+    # use accuracy as the metric
+    # metric = mx.metric.create('acc')
+    # train 5 epochs, i.e. going over the data iter one pass
+    for epoch in range(5):
+        train_iter.reset()
+        # metric.reset()
+        for batch in train_iter:
+            cor = mod.forward(batch, is_train=True)  # compute predictions
+            # mod.update_metric(metric, batch.label)  # accumulate prediction accuracy
+            grad = mod.backward()  # compute gradients
+            mod.update()  # update parameters
+            print('Epoch %d, Training cor %s grad %s' % (epoch, cor, grad))
+
+
 if __name__ == '__main__':
     mnist_shape = (1, 28, 28)
     iterators = get_mnist_data_iterator()
     net = get_symbol(mnist_shape)
-    model = mx.mod.Module(symbol=net, context=mx.cpu(),
-                          label_names=None, data_names=['data_fixed', 'data_moving'])
+    custom_training_simple_bind(net, iterators[0])
+    # model = mx.mod.Module(symbol=net, context=mx.cpu(),
+    #                       label_names=None, data_names=['data_fixed', 'data_moving'])
+    # custom_training(model, iterators[0])
     # a = mx.viz.plot_network(net)
     # a.render()
 
-    model.fit(iterators[0],  # eval_data=val_iter,
-                    optimizer='sgd',
-                    optimizer_params={'learning_rate': 0.1},
-                    eval_metric=mx.metric.Loss(),
-                    num_epoch=10)
+    # model.fit(iterators[0],  # eval_data=val_iter,
+    #                 optimizer='sgd',
+    #                 optimizer_params={'learning_rate': 0.1},
+    #                 eval_metric=mx.metric.Loss(),
+    #                 num_epoch=10)
     # NOTE!
     # to get this to work right now with mxnet v. 0.12.1
     # You have to add the following lines at the beginning of the in update_metric function in executor_group.py!
