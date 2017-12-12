@@ -116,9 +116,10 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     # parametrized by the output of the body network
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=image_shape, transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
-    cor = mx.sym.Correlation(data1=data_fixed, data2=stnet)
+    cor = mx.sym.Correlation(data1=data_fixed, data2=data_fixed, kernel_size=28, stride1=1, stride2=1, pad_size=0, max_displacement=0)
+    cor2 = mx.sym.Correlation(data1=data_fixed, data2=data_moving, kernel_size=28, stride1=1, stride2=1, max_displacement=0)
     loss = mx.sym.MakeLoss(cor, normalization='batch')
-    output = mx.sym.Group([mx.sym.BlockGrad(cor), loss])
+    output = mx.sym.Group([mx.sym.BlockGrad(cor), mx.sym.BlockGrad(cor2), mx.sym.BlockGrad(fc3), loss])
     return output
 
 
@@ -212,14 +213,21 @@ def custom_training_simple_bind(symbol, train_iter):
     # train 5 epochs, i.e. going over the data iter one pass
     for epoch in range(5):
         train_iter.reset()
+        avg_cor = 0
+        i = 0
         for batch in train_iter:
+            i += 1
             outs = executor.forward(is_train=True, data_fixed=batch.data[0], data_moving=batch.data[1])
             cor1 = executor.outputs[0]
-            grad1 = executor.outputs[1]
+            cor2 = executor.outputs[1]
+            fc3 = executor.outputs[2]
+            grad1 = executor.outputs[3]
             grad = executor.backward()  # compute gradients
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
-            print('Epoch %d, Training cor %s grad %s' % (epoch, cor1, grad1))
+            aval = cor1[0][0][0][0].asnumpy()[0]
+            avg_cor += float(aval)
+        print('Epoch %d, Training cor %s ' % (epoch, avg_cor/i))
 
 
 def custom_training(mod, train_iter):
