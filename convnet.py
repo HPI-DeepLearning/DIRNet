@@ -8,7 +8,7 @@ import mxnet as mx
 import numpy as np
 import gzip
 import struct
-import CustomNDArrayIter as customIter
+#import CustomNDArrayIter as customIter
 
 
 def get_mnist(mnistdir='./data/'):
@@ -28,52 +28,6 @@ def get_mnist(mnistdir='./data/'):
         mnistdir + 't10k-labels-idx1-ubyte.gz', mnistdir + 't10k-images-idx3-ubyte.gz')
     return {'train_data': train_img, 'train_label': train_lbl,
             'test_data': test_img, 'test_label': test_lbl}
-
-
-def get_mnist_data_iterator_w_labels(mnistdir='./data/', digit=5):
-    def get_iterator_single_digit(data, label):
-        one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
-            if label[index] == digit:
-                one_digit_indices.append(index)
-        one_digit_data = data[one_digit_indices]
-        one_digit_label = label[one_digit_indices]
-        fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
-        one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
-        for _ in one_digit_data:
-            one_digit_fixed_image.append(fixed_image)
-
-        iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
-                                     [one_digit_label, one_digit_label],
-                                     batch_size=1, shuffle=True)
-        return iterator
-
-    mnist = get_mnist(mnistdir)
-    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
-    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
-    return train_iter, val_iter
-
-
-def get_mnist_data_iterator(mnistdir='./data/', digit=5):
-    def get_iterator_single_digit(data, label):
-        one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
-            if label[index] == digit:
-                one_digit_indices.append(index)
-        one_digit_data = data[one_digit_indices]
-        one_digit_label = label[one_digit_indices]
-        fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
-        one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
-        for _ in one_digit_data:
-            one_digit_fixed_image.append(fixed_image)
-        data = {'data_fixed': one_digit_fixed_image, 'data_moving': one_digit_data}
-        iterator = customIter.NDArrayIter(data, batch_size=1, shuffle=True)
-        return iterator
-
-    mnist = get_mnist(mnistdir)
-    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
-    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
-    return train_iter, val_iter
 
 
 def conv_net_regressor(image_shape, bn_mom=0.9):
@@ -196,12 +150,14 @@ def custom_training_simple_bind(symbol, train_iter):
         i = 0
         for batch in train_iter:
             i += 1
-            outs = executor.forward(is_train=True, data_fixed=batch.data[0], data_moving=batch.data[1])
+            batch1 = batch.data
+            batch2 = train_iter.next().data
+            outs = executor.forward(is_train=True, data_fixed=batch1[0], data_moving=batch2[0])
             cor1 = executor.outputs[0]
             stnet = executor.outputs[1]
             fc3 = executor.outputs[2]
             print("Affine transformation parameters Theta: " + str(fc3))
-            grad1 = executor.outputs[3]
+            loss = executor.outputs[3]
             printNontZeroGradients(grads)
 
             executor.backward()  # compute gradients
@@ -209,7 +165,7 @@ def custom_training_simple_bind(symbol, train_iter):
                 customSGD(key, args[key], grads[key])
             aval = cor1[0][0][0][0].asnumpy()[0]
             avg_cor += float(aval)
-        print('Epoch %d, Training cor %s ' % (epoch, avg_cor/i))
+        print('Epoch %d, Training avg cor %s ' % (epoch, avg_cor/i))
 
 
 def printNontZeroGradients(grads):
@@ -226,25 +182,9 @@ def printNontZeroGradients(grads):
 
 if __name__ == '__main__':
     mnist_shape = (1, 1, 28, 28)
-    iterators = get_mnist_data_iterator()
+    mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
+    batch_size = 1
+    iterators = mx.io.NDArrayIter(mnist['train_data'], mnist['train_label'], batch_size, shuffle=True)
     net = get_symbol(mnist_shape)
-    custom_training_simple_bind(net, iterators[0])
-    # model = mx.mod.Module(symbol=net, context=mx.cpu(),
-    #                       label_names=None, data_names=['data_fixed', 'data_moving'])
-    # custom_training(model, iterators[0])
-    # a = mx.viz.plot_network(net)
-    # a.render()
+    custom_training_simple_bind(net, iterators)
 
-    # model.fit(iterators[0],  # eval_data=val_iter,
-    #                 optimizer='sgd',
-    #                 optimizer_params={'learning_rate': 0.1},
-    #                 eval_metric=mx.metric.Loss(),
-    #                 num_epoch=10)
-    # NOTE!
-    # to get this to work right now with mxnet v. 0.12.1
-    # You have to add the following lines at the beginning of the in update_metric function in executor_group.py!
-    #
-    # if self.label_layouts == None and self.label_names == None:
-    #     # special case: We train without labels
-    #     eval_metric.update_dict({}, {})
-    #     return
