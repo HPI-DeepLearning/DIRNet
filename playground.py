@@ -74,11 +74,11 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     return train_iter, val_iter
 
 
-def printNumpyArray(a):
+def printNumpyArray(a, thresh=0.5):
     for i in range(len(a)):
         linestr = ''
         for k in range(len(a[0])):
-            if a[i][k] > 0:
+            if a[i][k] > thresh:
                 linestr += 'X'
             else:
                 linestr += '_'
@@ -89,6 +89,7 @@ def Init(key, arr):
     if "fc2_bias" in key:
         # initialize with identity transformation
         initial = np.array([[1., 1, 0], [1, 1., 0]])
+        initial = np.array([[-0.00657603, -0.05496656,  0.14796074,  0.01942044,  0.04813603,  0.0093481 ]])
         initial = initial.astype('float32').flatten()
         arr[:] = initial
     elif "weight" in key:

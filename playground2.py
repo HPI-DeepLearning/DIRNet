@@ -109,10 +109,10 @@ def printNumpyArray(a, thresh=0.5):
 
 def conv_net_regressor(image_shape, bn_mom=0.9):
     # We have 2 data sources and concatenate them
-    data_fixed = mx.sym.Variable(name='data_fixed')
-    data_moving = mx.sym.Variable(name='data_moving')
-    concat_data = mx.sym.concat(*[data_fixed, data_moving])
-    batched = mx.sym.BatchNorm(data=concat_data, fix_gamma=True, eps=2e-5, momentum=bn_mom, name='bn_data')
+    data_fixed = mx.sym.Variable(name='data')
+    #data_moving = mx.sym.Variable(name='data_moving')
+    #concat_data = mx.sym.concat(*[data_fixed, data_moving])
+    batched = mx.sym.BatchNorm(data=data_fixed, fix_gamma=True, eps=2e-5, momentum=bn_mom, name='bn_data')
     # The number of kernels per layer can be of arbitrary size, but the number of kernels of the output layer is
     # determined by the dimensionality of the input images
     filter_list = [16, 32, 64, 128]
@@ -139,16 +139,17 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
         body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
 
     flatten = mx.sym.flatten(data=body)
-    fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=6)
+    fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=20)
+    net = mx.sym.Softmax(data=fc3, name='softmax')
     # The Spatial Transformer performs a affine transformation to the moving image,
     # parametrized by the output of the body network
-    stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
-                                      sampler_type="bilinear", name='SpatialTransformer')
-    cor = -mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
+    #stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
+    #                                  sampler_type="bilinear", name='SpatialTransformer')
+    #cor = -mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
     #cor2 = mx.sym.Correlation(data1=data_fixed, data2=data_moving, kernel_size=28, stride1=1, stride2=1, max_displacement=0)
-    loss = mx.sym.MakeLoss(cor, normalization='batch')
-    output = mx.sym.Group([mx.sym.BlockGrad(cor), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
-    return output
+    #loss = mx.sym.MakeLoss(cor, normalization='batch')
+    #output = mx.sym.Group([mx.sym.BlockGrad(cor), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
+    return net
 
 
 def get_symbol(image_shape):
@@ -166,12 +167,12 @@ def custom_training_simple_bind(symbol, iterators):
 
     # helper function
     def Init(key, arr):
-        if "fullyconnected0_bias" in key:
-            # initialize with identity transformation
-            initial = np.array([[1., 0, 0], [0, 1., 0]])
-            initial = initial.astype('float32').flatten()
-            arr[:] = initial
-        elif "weight" in key:
+        # if "fullyconnected0_bias" in key:
+        #     # initialize with identity transformation
+        #     initial = np.array([[1., 0, 0], [0, 1., 0]])
+        #     initial = initial.astype('float32').flatten()
+        #     arr[:] = initial
+        if "weight" in key:
             arr[:] = mx.random.uniform(-0.07, 0.07, arr.shape)
             # or
             # arr[:] = np.random.uniform(-0.07, 0.07, arr.shape)
@@ -199,7 +200,11 @@ def custom_training_simple_bind(symbol, iterators):
         else:
             pass
 
-    executor = symbol.simple_bind(ctx=mx.cpu(), data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
+    def Accuracy(label, pred_prob):
+        pred = np.argmax(pred_prob, axis=1)
+        return np.sum(label == pred) * 1.0 / label.shape[0]
+
+    executor = symbol.simple_bind(ctx=mx.gpu(), data=(1, 1, 28, 28),
                                   label_shapes=None, grad_req='write')
 
     # get argument arrays
@@ -220,32 +225,36 @@ def custom_training_simple_bind(symbol, iterators):
     for key, arr in args.items():
         Init(key, arr)
     keys = symbol.list_arguments()
-    train_iter = iterators[0]
+    train_iter = iterators
+    train_acc = 0.
+    pred_prob = mx.nd.zeros(executor.outputs[0].shape)
     # train 5 epochs, i.e. going over the data iter one pass
     for epoch in range(5):
         train_iter.reset()
         avg_cor = 0
         i = 0
         fc3 = None
-        fixed_img_data = train_iter.next().data
+        #fixed_img_data = train_iter.next().data
         for batch in train_iter:
             i += 1
             # printNumpyArray(batch.data[0][0][0])
-            outs = executor.forward(is_train=True, data_fixed=fixed_img_data[0], data_moving=batch.data[0])
-            cor1 = executor.outputs[0]
-            stnet = executor.outputs[1]
-            fc3 = executor.outputs[2]
-           # print("Affine transformation parameters Theta: " + str(fc3))
-            loss = executor.outputs[3]
+            label = batch.label[0]
+            outs = executor.forward(is_train=True, data=batch.data[0], softmax_label=label)
+            pred_prob[:] = executor.outputs[0]
+            train_acc += Accuracy(label.asnumpy(), pred_prob.asnumpy())
+           #  stnet = executor.outputs[1]
+           #  fc3 = executor.outputs[2]
+           # # print("Affine transformation parameters Theta: " + str(fc3))
+           #  loss = executor.outputs[3]
 
             executor.backward()  # compute gradients
             printNontZeroGradients(grads)
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
-            aval = cor1[0][0][0][0].asnumpy()[0]
-            avg_cor += float(aval)
-        print("Affine transformation parameters Theta: " + str(fc3))
-        print('Epoch %d, Training avg cor %s ' % (epoch, avg_cor/i))
+            # aval = cor1[0][0][0][0].asnumpy()[0]
+            # avg_cor += float(aval)
+        # print("Affine transformation parameters Theta: " + str(fc3))
+        print('Epoch %d, Training acc %s ' % (epoch, train_acc))
 
 
 def printNontZeroGradients(grads, thresh=0):
@@ -262,8 +271,10 @@ def printNontZeroGradients(grads, thresh=0):
 
 if __name__ == '__main__':
     mnist_shape = (1, 1, 28, 28)
-    #mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
+    # mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
+    mnist = mx.test_utils.get_mnist()
+    standard_iter = mx.io.NDArrayIter(mnist['train_data'], mnist['train_label'], 1, shuffle=True)
     batch_size = 1
     iterator = get_mnist_data_iterator(mnistdir='./data/', digit=1)
     net = get_symbol(mnist_shape)
-    custom_training_simple_bind(net, iterator)
+    custom_training_simple_bind(net, standard_iter)
