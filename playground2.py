@@ -140,7 +140,7 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
 
     flatten = mx.sym.flatten(data=body)
     fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=20)
-    net = mx.sym.Softmax(data=fc3, name='softmax')
+    net = mx.sym.SoftmaxOutput(data=fc3, name='softmax')
     # The Spatial Transformer performs a affine transformation to the moving image,
     # parametrized by the output of the body network
     #stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
@@ -229,7 +229,7 @@ def custom_training_simple_bind(symbol, iterators):
     train_acc = 0.
     pred_prob = mx.nd.zeros(executor.outputs[0].shape)
     # train 5 epochs, i.e. going over the data iter one pass
-    for epoch in range(5):
+    for epoch in range(50):
         train_iter.reset()
         avg_cor = 0
         i = 0
@@ -248,13 +248,17 @@ def custom_training_simple_bind(symbol, iterators):
            #  loss = executor.outputs[3]
 
             executor.backward()  # compute gradients
-            printNontZeroGradients(grads)
+            if i%1800 == 0:
+                print("batch " + str(i))    
+                printNontZeroGradients(grads)
+                print(grads['conv3_weight'])
+                print(args['conv3_weight'][0])
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
             # aval = cor1[0][0][0][0].asnumpy()[0]
             # avg_cor += float(aval)
         # print("Affine transformation parameters Theta: " + str(fc3))
-        print('Epoch %d, Training acc %s ' % (epoch, train_acc))
+        print('Epoch %d, Training acc %s ' % (epoch, train_acc/i))
 
 
 def printNontZeroGradients(grads, thresh=0):
@@ -275,6 +279,6 @@ if __name__ == '__main__':
     mnist = mx.test_utils.get_mnist()
     standard_iter = mx.io.NDArrayIter(mnist['train_data'], mnist['train_label'], 1, shuffle=True)
     batch_size = 1
-    iterator = get_mnist_data_iterator(mnistdir='./data/', digit=1)
+    iterator = get_mnist_data_iterator(mnistdir='./', digit=1)
     net = get_symbol(mnist_shape)
     custom_training_simple_bind(net, standard_iter)
