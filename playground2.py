@@ -226,13 +226,13 @@ def custom_training_simple_bind(symbol, iterators):
         Init(key, arr)
     keys = symbol.list_arguments()
     train_iter = iterators
-    train_acc = 0.
     pred_prob = mx.nd.zeros(executor.outputs[0].shape)
     # train 5 epochs, i.e. going over the data iter one pass
     for epoch in range(50):
         train_iter.reset()
         avg_cor = 0
         i = 0
+        train_acc = 0.
         fc3 = None
         #fixed_img_data = train_iter.next().data
         for batch in train_iter:
