@@ -204,7 +204,7 @@ def custom_training_simple_bind(symbol, iterators):
         pred = np.argmax(pred_prob, axis=1)
         return np.sum(label == pred) * 1.0 / label.shape[0]
 
-    executor = symbol.simple_bind(ctx=mx.gpu(), data=(1, 1, 28, 28),
+    executor = symbol.simple_bind(ctx=mx.cpu(), data=(1, 1, 28, 28),
                                   label_shapes=None, grad_req='write')
 
     # get argument arrays
@@ -271,8 +271,8 @@ def printNontZeroGradients(grads, thresh=0):
 
 if __name__ == '__main__':
     mnist_shape = (1, 1, 28, 28)
-    # mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
-    mnist = mx.test_utils.get_mnist()
+    mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
+    #mnist = mx.test_utils.get_mnist()
     standard_iter = mx.io.NDArrayIter(mnist['train_data'], mnist['train_label'], 1, shuffle=True)
     batch_size = 1
     iterator = get_mnist_data_iterator(mnistdir='./data/', digit=1)
