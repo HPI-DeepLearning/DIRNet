@@ -50,10 +50,11 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     # parametrized by the output of the body network
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
-    cor = mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
+    #cor = mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
+    rmse = (mx.sym.sum((stnet-data_fixed).__pow__(2))).__pow__(0.5)
     #cor2 = mx.sym.Correlation(data1=data_fixed, data2=data_moving, kernel_size=28, stride1=1, stride2=1, max_displacement=0)
-    loss = mx.sym.MakeLoss(cor, normalization='batch')
-    output = mx.sym.Group([mx.sym.BlockGrad(cor), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
+    loss = mx.sym.MakeLoss(rmse, normalization='batch')
+    output = mx.sym.Group([mx.sym.BlockGrad(rmse), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
     return output
 
 
@@ -149,10 +150,10 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.cpu(), lr=0.001):
                 print('   STN seems to work')
             sh = stnet.shape
             fc3 = executor.outputs[2]
-            print("Affine transformation parameters Theta: " + str(fc3))
+            #print("Affine transformation parameters Theta: " + str(fc3))
             loss = executor.outputs[3]
-            hlp.printNumpyArray(stnet.asnumpy()[0][0], thresh=0)
-            hlp.printNontZeroGradients(grads)
+            #hlp.printNumpyArray(stnet.asnumpy()[0][0], thresh=0)
+            #hlp.printNontZeroGradients(grads)
             executor.backward()  # compute gradients
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
