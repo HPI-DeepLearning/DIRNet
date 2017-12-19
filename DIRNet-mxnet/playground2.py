@@ -251,7 +251,7 @@ def custom_training_simple_bind(symbol, iterators):
             if i%1800 == 0:
                 print("batch " + str(i))    
                 printNontZeroGradients(grads)
-                print(grads['conv3_weight'])
+                #print(grads['conv3_weight'])
                 print(args['conv3_weight'][0])
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
