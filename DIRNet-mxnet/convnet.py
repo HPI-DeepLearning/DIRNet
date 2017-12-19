@@ -43,14 +43,14 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
         # body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
         body = mx.sym.LeakyReLU(data=body, act_type='elu', name='relu' + str(i))
       #  body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
-
+   # body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
     flatten = mx.sym.flatten(data=body)
     fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=6)
     # The Spatial Transformer performs a affine transformation to the moving image,
     # parametrized by the output of the body network
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
-    cor = -mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
+    cor = mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
     #cor2 = mx.sym.Correlation(data1=data_fixed, data2=data_moving, kernel_size=28, stride1=1, stride2=1, max_displacement=0)
     loss = mx.sym.MakeLoss(cor, normalization='batch')
     output = mx.sym.Group([mx.sym.BlockGrad(cor), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
@@ -61,7 +61,7 @@ def get_symbol(image_shape):
     return conv_net_regressor(image_shape)
 
 
-def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu()):
+def custom_training_simple_bind(symbol, iterators, ctx=mx.cpu(), lr=0.001):
     '''
     Our own training method for the network. using the low-level simple_bind API
     Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
@@ -72,7 +72,10 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu()):
 
     # helper function
     def Init(key, arr):
-        if "fullyconnected0_bias" in key:
+        if "fullyconnected0_weight" in key:
+            # initialize with identity transformation
+            arr[:] = 0
+        elif "fullyconnected0_bias" in key:
             # initialize with identity transformation
             initial = np.array([[1., 0, 0], [0, 1., 0]])
             initial = initial.astype('float32').flatten()
@@ -90,7 +93,7 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu()):
             # for batch norm bias
             arr[:] = 0
 
-    def customSGD(key, weight, grad, lr=0.01, grad_norm=1):
+    def customSGD(key, weight, grad, lr=lr, grad_norm=1):
         # key is key for weight, we can customize update rule
         # weight is weight array
         # grad is grad array
@@ -140,10 +143,16 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu()):
             outs = executor.forward(is_train=True, data_fixed=fixed_img_data[0], data_moving=batch.data[0])
             cor1 = executor.outputs[0]
             stnet = executor.outputs[1]
+            if np.sum(stnet.asnumpy()) == 0:
+                print('   STN produces empty feature map!')
+            else:
+                print('   STN seems to work')
+            sh = stnet.shape
             fc3 = executor.outputs[2]
-           # print("Affine transformation parameters Theta: " + str(fc3))
+            print("Affine transformation parameters Theta: " + str(fc3))
             loss = executor.outputs[3]
-
+            hlp.printNumpyArray(stnet.asnumpy()[0][0], thresh=0)
+            hlp.printNontZeroGradients(grads)
             executor.backward()  # compute gradients
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
