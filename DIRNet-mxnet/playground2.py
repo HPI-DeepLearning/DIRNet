@@ -126,7 +126,7 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
                                       no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
         # TO DO: the original authors use exponential linear units as activation
-        body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
+        body = mx.sym.LeakyReLU(data=body, act_type='leaky', name='relu' + str(i))
         body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
     # Subsequently, three 1 × 1 convolutional layers are applied to make the ConvNet regressor fully convolutional
     for k in range(3):
@@ -135,7 +135,7 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
                                   no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
         # TO DO: the original authors use exponential linear units as activation
-        body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
+        body = mx.sym.LeakyReLU(data=body, act_type='leaky', name='relu' + str(i))
         body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
 
     flatten = mx.sym.flatten(data=body)
