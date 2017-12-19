@@ -162,7 +162,7 @@ def custom_training_simple_bind(symbol, iterators):
                 print("batch " + str(i))    
                 hlp.printNontZeroGradients(grads)
                 #print(grads['conv3_weight'])
-                print(args['conv3_weight'][0])
+                #print(args['conv3_weight'][0])
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
             # aval = cor1[0][0][0][0].asnumpy()[0]

@@ -7,104 +7,9 @@ logging.getLogger().setLevel(logging.DEBUG)
 import mxnet as mx
 import numpy as np
 import gzip
+import helper as hlp
 import struct
 #import CustomNDArrayIter as customIter
-
-
-def get_mnist(mnistdir='./data/'):
-    def read_data(label_url, image_url):
-        with gzip.open(label_url) as flbl:
-            struct.unpack(">II", flbl.read(8))
-            label = np.fromstring(flbl.read(), dtype=np.int8)
-        with gzip.open(image_url, 'rb') as fimg:
-            _, _, rows, cols = struct.unpack(">IIII", fimg.read(16))
-            image = np.fromstring(fimg.read(), dtype=np.uint8).reshape(len(label), rows, cols)
-            image = image.reshape(image.shape[0], 1, 28, 28).astype(np.float32) / 255
-        return label, image
-
-    (train_lbl, train_img) = read_data(
-        mnistdir + 'train-labels-idx1-ubyte.gz', mnistdir + 'train-images-idx3-ubyte.gz')
-    (test_lbl, test_img) = read_data(
-        mnistdir + 't10k-labels-idx1-ubyte.gz', mnistdir + 't10k-images-idx3-ubyte.gz')
-    return {'train_data': train_img, 'train_label': train_lbl,
-            'test_data': test_img, 'test_label': test_lbl}
-
-
-def get_mnist_data_iterator_w_labels(mnistdir='./data/', digit=1):
-    def get_iterator_single_digit(data, label):
-        one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
-            if label[index] == digit:
-                one_digit_indices.append(index)
-        one_digit_data = data[one_digit_indices]
-        one_digit_label = label[one_digit_indices]
-        fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
-        one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
-        for _ in one_digit_data:
-            one_digit_fixed_image.append(fixed_image)
-
-        iterator = mx.io.NDArrayIter([one_digit_fixed_image, one_digit_data],
-                                     [one_digit_label, one_digit_label],
-                                     batch_size=1, shuffle=True)
-        return iterator
-
-    mnist = get_mnist(mnistdir)
-    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
-    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
-    return train_iter, val_iter
-
-
-def get_mnist_data_iterator_two_data_sources(mnistdir='./data/', digit=1):
-    def get_iterator_single_digit(data, label):
-        one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
-            if label[index] == digit:
-                one_digit_indices.append(index)
-        one_digit_data = data[one_digit_indices]
-        one_digit_label = label[one_digit_indices]
-        fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
-        one_digit_fixed_image = []  # array of same length as above data array, but its the same img multiple times
-        for _ in one_digit_data:
-            one_digit_fixed_image.append(fixed_image)
-        data = {'data_fixed': one_digit_fixed_image, 'data_moving': one_digit_data}
-        iterator = mx.io.NDArrayIter(data, batch_size=1, shuffle=True)
-        return iterator
-
-    mnist = get_mnist(mnistdir)
-    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
-    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
-    return train_iter, val_iter
-
-
-def get_mnist_data_iterator(mnistdir='./data/', digit=1):
-    def get_iterator_single_digit(data, label):
-        one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
-            if label[index] == digit:
-                one_digit_indices.append(index)
-        one_digit_data = data[one_digit_indices]
-        #one_digit_label = label[one_digit_indices]
-        # fixed_image = one_digit_data[np.random.randint(0, len(one_digit_label))]
-        #data = {'data_fixed': one_digit_fixed_image, 'data_moving': one_digit_data}
-        iterator = mx.io.NDArrayIter(one_digit_data, batch_size=1, shuffle=True)
-        return iterator
-
-    mnist = get_mnist(mnistdir)
-    train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
-    val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
-    return train_iter, val_iter
-
-
-
-def printNumpyArray(a, thresh=0.5):
-    for i in range(len(a)):
-        linestr = ''
-        for k in range(len(a[0])):
-            if a[i][k] > thresh:
-                linestr += 'X'
-            else:
-                linestr += '_'
-        print(linestr)
 
 
 def conv_net_regressor(image_shape, bn_mom=0.9):
@@ -126,18 +31,18 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
                                       no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
         # TO DO: the original authors use exponential linear units as activation
-        body = mx.sym.LeakyReLU(data=body, act_type='leaky', name='relu' + str(i))
-        body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
+        body = mx.sym.LeakyReLU(data=body, act_type='elu', name='relu' + str(i))
+        body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(1, 1), pad=(1, 1), pool_type='avg')
     # Subsequently, three 1 × 1 convolutional layers are applied to make the ConvNet regressor fully convolutional
-    for k in range(3):
+    for k in range(2):
         i = k + 4
         body = mx.sym.Convolution(data=body, num_filter=256, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
                                   no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
         # TO DO: the original authors use exponential linear units as activation
         # body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
-        body = mx.sym.LeakyReLU(data=body, act_type='leaky', name='relu' + str(i))
-        body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
+        body = mx.sym.LeakyReLU(data=body, act_type='elu', name='relu' + str(i))
+      #  body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
 
     flatten = mx.sym.flatten(data=body)
     fc3 = mx.sym.FullyConnected(data=flatten, num_hidden=6)
@@ -156,7 +61,7 @@ def get_symbol(image_shape):
     return conv_net_regressor(image_shape)
 
 
-def custom_training_simple_bind(symbol, iterators):
+def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu()):
     '''
     Our own training method for the network. using the low-level simple_bind API
     Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
@@ -200,7 +105,7 @@ def custom_training_simple_bind(symbol, iterators):
         else:
             pass
 
-    executor = symbol.simple_bind(ctx=mx.cpu(), data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
+    executor = symbol.simple_bind(ctx=ctx, data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
                                   label_shapes=None, grad_req='write')
 
     # get argument arrays
@@ -240,7 +145,6 @@ def custom_training_simple_bind(symbol, iterators):
             loss = executor.outputs[3]
 
             executor.backward()  # compute gradients
-            printNontZeroGradients(grads)
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
             aval = cor1[0][0][0][0].asnumpy()[0]
@@ -249,22 +153,10 @@ def custom_training_simple_bind(symbol, iterators):
         print('Epoch %d, Training avg cor %s ' % (epoch, avg_cor/i))
 
 
-def printNontZeroGradients(grads, thresh=0):
-    print("Gradient arrays that contain non-zero values:")
-    for key in grads.keys():
-        allZero = True
-        for v in np.nditer(grads[key].asnumpy()):
-            if v > thresh:
-                allZero = False
-                break
-        if not allZero:
-            print('\t ' + key)
-
-
 if __name__ == '__main__':
     mnist_shape = (1, 1, 28, 28)
     #mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
     batch_size = 1
-    iterator = get_mnist_data_iterator(mnistdir='./data/', digit=1)
+    iterator = hlp.get_mnist_data_iterator(mnistdir='./data/', digit=1)
     net = get_symbol(mnist_shape)
     custom_training_simple_bind(net, iterator)
