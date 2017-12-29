@@ -4,7 +4,9 @@ class Config(object):
 def get_config(is_train):
   config = Config()
   if is_train:
-    config.use_saved_data = False,
+    config.save_input=False
+    config.sequence_length=10
+    config.use_saved_data = True
     config.batch_size = 1
     config.im_size = [124, 124]
     config.lr = 1e-4

@@ -109,6 +109,7 @@ def WarpST(U, V, out_size, name='DeformableTransformer', **kwargs):
             height = tf.shape(U)[1]
             width = tf.shape(U)[2]
             num_channels = tf.shape(U)[3]
+            print("inside"+str(U.get_shape()))
 
             # grid of (x_t, y_t, 1), eq (1) in ref [1]
             height_f = tf.cast(height, 'float32')
@@ -135,7 +136,7 @@ def WarpST(U, V, out_size, name='DeformableTransformer', **kwargs):
                 U, x_s_flat, y_s_flat, out_size)
 
             output = tf.reshape(
-                input_transformed, 
+                input_transformed,
                 tf.stack([num_batch, out_height, out_width, num_channels]))
             return output
 

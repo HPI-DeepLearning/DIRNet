@@ -13,7 +13,7 @@ def main():
   mkdir(config.ckpt_dir)
 
   reg = DIRNet(sess, config, "DIRNet", is_train=True)
-  dh = MNISTDataHandler("MNIST_data", is_train=True)
+  dh = MNISTDataHandler("MNIST_data",config, is_train=True)
 
   for i in range(config.iteration):
     batch_x, batch_y = dh.sample_pair(config.batch_size)
