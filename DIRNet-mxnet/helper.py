@@ -95,6 +95,27 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
     return train_iter, val_iter
 
+def ncc(x, y):
+    # mean_x = tf.reduce_mean(x, [1, 2, 3], keep_dims=True)
+    # mean_y = tf.reduce_mean(y, [1, 2, 3], keep_dims=True)
+    # mean_x2 = tf.reduce_mean(tf.square(x), [1, 2, 3], keep_dims=True)
+    # mean_y2 = tf.reduce_mean(tf.square(y), [1, 2, 3], keep_dims=True)
+    # stddev_x = tf.reduce_sum(tf.sqrt(
+    #     mean_x2 - tf.square(mean_x)), [1, 2, 3], keep_dims=True)
+    # stddev_y = tf.reduce_sum(tf.sqrt(
+    #     mean_y2 - tf.square(mean_y)), [1, 2, 3], keep_dims=True)
+    # return tf.reduce_mean((x - mean_x) * (y - mean_y) / (stddev_x * stddev_y))
+    mean_x = mx.symbol.mean(data=x, axis=(1, 2, 3), keepdims=True)
+    mean_y = mx.symbol.mean(data=y, axis=(1, 2, 3), keepdims=True)
+    mean_x2 = mx.symbol.mean(mx.symbol.square(x), (1, 2, 3), keepdims=True)
+    mean_y2 = mx.symbol.mean(mx.symbol.square(x), (1, 2, 3), keepdims=True)
+    stddev_x = mx.symbol.sum(mx.symbol.sqrt(
+        mean_x2 - mx.symbol.square(mean_x)), (1, 2, 3), keepdims=True)
+    stddev_y = mx.symbol.sum(mx.symbol.sqrt(
+        mean_y2 - mx.symbol.square(mean_y)), (1, 2, 3), keepdims=True)
+    top = mx.symbol.broadcast_sub(x, mean_x) * (mx.symbol.broadcast_sub(y, mean_y))
+    return mx.symbol.mean(mx.symbol.broadcast_div(top, (stddev_x * stddev_y)))
+
 
 def printNumpyArray(a, thresh=0.5):
     for i in range(len(a)):

@@ -39,7 +39,6 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
         body = mx.sym.Convolution(data=body, num_filter=256, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
                                   no_bias=True, name="conv" + str(i))
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=2e-5, momentum=bn_mom, name='bn' + str(i))
-        # TO DO: the original authors use exponential linear units as activation
         # body = mx.sym.Activation(data=body, act_type='relu', name='relu' + str(i))
         body = mx.sym.LeakyReLU(data=body, act_type='elu', name='relu' + str(i))
       #  body = mx.sym.Pooling(data=body, kernel=(2, 2), stride=(2, 2), pad=(1, 1), pool_type='avg')
@@ -51,10 +50,10 @@ def conv_net_regressor(image_shape, bn_mom=0.9):
     stnet = mx.sym.SpatialTransformer(data=data_moving, loc=fc3, target_shape=(28, 28), transform_type='affine',
                                       sampler_type="bilinear", name='SpatialTransformer')
     #cor = mx.sym.Correlation(data1=stnet, data2=data_fixed, kernel_size=28, stride1=2, stride2=2, pad_size=0, max_displacement=0)
-    rmse = (mx.sym.sum((stnet-data_fixed).__pow__(2))).__pow__(0.5)
+    #rmse = (mx.sym.sum((stnet-data_fixed).__pow__(2))).__pow__(0.5)
     #cor2 = mx.sym.Correlation(data1=data_fixed, data2=data_moving, kernel_size=28, stride1=1, stride2=1, max_displacement=0)
-    loss = mx.sym.MakeLoss(rmse, normalization='batch')
-    output = mx.sym.Group([mx.sym.BlockGrad(rmse), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
+    loss = mx.sym.MakeLoss(hlp.ncc(data_moving, data_fixed), normalization='batch')
+    output = mx.sym.Group([mx.sym.BlockGrad(loss), mx.sym.BlockGrad(stnet), mx.sym.BlockGrad(fc3), loss])
     return output
 
 
@@ -62,7 +61,7 @@ def get_symbol(image_shape):
     return conv_net_regressor(image_shape)
 
 
-def custom_training_simple_bind(symbol, iterators, ctx=mx.cpu(), lr=0.001):
+def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu(), lr=0.01):
     '''
     Our own training method for the network. using the low-level simple_bind API
     Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
@@ -131,6 +130,7 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.cpu(), lr=0.001):
         Init(key, arr)
     keys = symbol.list_arguments()
     train_iter = iterators[0]
+    eval_iter = iterators[1]
     # train 5 epochs, i.e. going over the data iter one pass
     for epoch in range(5):
         train_iter.reset()
@@ -138,26 +138,27 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.cpu(), lr=0.001):
         i = 0
         fc3 = None
         fixed_img_data = train_iter.next().data
+        hlp.printNumpyArray(fixed_img_data[0][0][0], thresh=0)
         for batch in train_iter:
             i += 1
-            # printNumpyArray(batch.data[0][0][0])
-            outs = executor.forward(is_train=True, data_fixed=fixed_img_data[0], data_moving=batch.data[0])
+            executor.forward(is_train=True, data_fixed=fixed_img_data[0], data_moving=batch.data[0])
             cor1 = executor.outputs[0]
             stnet = executor.outputs[1]
-            if np.sum(stnet.asnumpy()) == 0:
-                print('   STN produces empty feature map!')
-            else:
-                print('   STN seems to work')
-            sh = stnet.shape
-            fc3 = executor.outputs[2]
+            # if np.sum(stnet.asnumpy()) == 0:
+            #     print('   STN produces empty feature map!')
+            # else:
+            #     print('   STN seems to work')
+            #sh = stnet.shape
+            #fc3 = executor.outputs[2]
             #print("Affine transformation parameters Theta: " + str(fc3))
             loss = executor.outputs[3]
-            #hlp.printNumpyArray(stnet.asnumpy()[0][0], thresh=0)
+            print("loss " + str(loss.asnumpy()[0]))
+            hlp.printNumpyArray(stnet.asnumpy()[0][0], thresh=0)
             #hlp.printNontZeroGradients(grads)
             executor.backward()  # compute gradients
             for key in keys:  # update parameters
                 customSGD(key, args[key], grads[key])
-            aval = cor1[0][0][0][0].asnumpy()[0]
+            aval = cor1.asnumpy()[0]
             avg_cor += float(aval)
         print("Affine transformation parameters Theta: " + str(fc3))
         print('Epoch %d, Training avg cor %s ' % (epoch, avg_cor/i))
