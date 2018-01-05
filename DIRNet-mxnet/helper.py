@@ -6,6 +6,8 @@ from requests.api import post
 logging.getLogger().setLevel(logging.DEBUG)
 import mxnet as mx
 import numpy as np
+from PIL import Image
+import scipy.misc
 import gzip
 import struct
 from mxnet import nd, autograd
@@ -80,7 +82,7 @@ def get_mnist_data_iterator_two_data_sources(mnistdir='../data/', digit=1):
 def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     def get_iterator_single_digit(data, label):
         one_digit_indices = []  # Contains all indices with images depicting the digit
-        # for index in range(len(label)):  # There might be a faster way to do this
+        #for index in range(90):  # There might be a faster way to do this
         for index in range(len(label)):  # There might be a faster way to do this
             if label[index] == digit:
                 one_digit_indices.append(index)
@@ -137,6 +139,13 @@ def printNumpyArray(a, thresh=0.5):
                 linestr += '_'
         print(linestr)
 
+
+def saveArrayAsImg(array, filepath='./imgfromarray.png'):
+    #print(type(array))
+    #print(np.shape(array))
+    #im = Image.fromarray(array)
+    #im.save(filepath)
+    scipy.misc.imsave(arr=array, name=filepath)
 
 def printNontZeroGradients(grads, thresh=0):
     print("Gradient arrays that contain non-zero values:")

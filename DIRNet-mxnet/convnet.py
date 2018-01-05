@@ -112,7 +112,6 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu(), lr=0.0000001):
 
     executor = symbol.simple_bind(ctx=ctx, data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
                                   label_shapes=None, grad_req='write')
-
     # get argument arrays
     arg_arrays = executor.arg_arrays
     # get grad arrays
@@ -136,7 +135,7 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu(), lr=0.0000001):
     eval_iter = iterators[1]
     debug = False
     # train 5 epochs, i.e. going over the data iter one pass
-    for epoch in range(20):
+    for epoch in range(7):
         train_iter.reset()
         fc3 = None
         avg_cor = 0
@@ -179,6 +178,16 @@ def custom_training_simple_bind(symbol, iterators, ctx=mx.gpu(), lr=0.0000001):
             i += 1
         print('Epoch %d, Evaluation avg rmse %s ' % (epoch, avg_cor/i))
 
+    # save some to see what the model does
+    hlp.saveArrayAsImg(fixed_img_data[0].asnumpy()[0][0], "./fixed.png")
+    train_iter.reset()
+    for l in range(7):
+        batch = train_iter.next()
+        moving = batch.data[0]
+        executor.forward(is_train=True, data_fixed=fixed_img_data[0], data_moving=moving)
+        stnet = executor.outputs[1]
+        hlp.saveArrayAsImg(stnet.asnumpy()[0][0], './{0}0warped_{0}.png'.format(l))
+        hlp.saveArrayAsImg(moving.asnumpy()[0][0], './{0}1original_{0}.png'.format(l))
 
 if __name__ == '__main__':
     mnist_shape = (1, 1, 28, 28)
