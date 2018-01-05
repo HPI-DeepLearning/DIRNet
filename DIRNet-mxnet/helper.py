@@ -80,7 +80,8 @@ def get_mnist_data_iterator_two_data_sources(mnistdir='../data/', digit=1):
 def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     def get_iterator_single_digit(data, label):
         one_digit_indices = []  # Contains all indices with images depicting the digit
-        for index in range(len(label)):  # There might be a faster way to do this
+        # for index in range(len(label)):  # There might be a faster way to do this
+        for index in range(100):  # There might be a faster way to do this
             if label[index] == digit:
                 one_digit_indices.append(index)
         one_digit_data = data[one_digit_indices]
@@ -108,13 +109,22 @@ def ncc(x, y):
     mean_x = mx.symbol.mean(data=x, axis=(1, 2, 3), keepdims=True)
     mean_y = mx.symbol.mean(data=y, axis=(1, 2, 3), keepdims=True)
     mean_x2 = mx.symbol.mean(mx.symbol.square(x), (1, 2, 3), keepdims=True)
-    mean_y2 = mx.symbol.mean(mx.symbol.square(x), (1, 2, 3), keepdims=True)
+    mean_y2 = mx.symbol.mean(mx.symbol.square(y), (1, 2, 3), keepdims=True)
     stddev_x = mx.symbol.sum(mx.symbol.sqrt(
         mean_x2 - mx.symbol.square(mean_x)), (1, 2, 3), keepdims=True)
     stddev_y = mx.symbol.sum(mx.symbol.sqrt(
         mean_y2 - mx.symbol.square(mean_y)), (1, 2, 3), keepdims=True)
     top = mx.symbol.broadcast_sub(x, mean_x) * (mx.symbol.broadcast_sub(y, mean_y))
-    return mx.symbol.mean(mx.symbol.broadcast_div(top, (stddev_x * stddev_y)))
+    # return -mx.symbol.mean(mx.symbol.broadcast_div(top, mx.symbol.broadcast_sub((stddev_x * stddev_y), 0.1)))
+    return -mx.symbol.mean(mx.symbol.broadcast_div((top + 0.1), ((stddev_x * stddev_y) + 0.1)))
+
+
+def rmse(x, y):
+    error = mx.symbol.broadcast_sub(x, y)
+    squared = mx.symbol.square(error)
+    avg = mx.symbol.mean(squared)
+    rooted = mx.symbol.sqrt(avg)
+    return rooted
 
 
 def printNumpyArray(a, thresh=0.5):
@@ -138,6 +148,18 @@ def printNontZeroGradients(grads, thresh=0):
                 break
         if not allZero:
             print('\t ' + key)
+
+def printNaNGradients(grads, thresh=0):
+    print("Gradient arrays that contain non-zero values:")
+    for key in grads.keys():
+        hasNan = False
+        for v in np.nditer(grads[key].asnumpy()):
+            if np.isnan(v):
+                hasNan = True
+                break
+        if hasNan:
+            print('\t ' + key + ' has NaN values!')
+
 
 
 def pure_batch_norm(X, gamma, beta, eps = 2e-5):
