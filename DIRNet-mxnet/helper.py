@@ -81,7 +81,7 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     def get_iterator_single_digit(data, label):
         one_digit_indices = []  # Contains all indices with images depicting the digit
         # for index in range(len(label)):  # There might be a faster way to do this
-        for index in range(100):  # There might be a faster way to do this
+        for index in range(len(label)):  # There might be a faster way to do this
             if label[index] == digit:
                 one_digit_indices.append(index)
         one_digit_data = data[one_digit_indices]
