@@ -9,7 +9,6 @@ from config import get_config
 import random
 import h5py
 
-use_saved_data=True
 
 class MNISTDataHandler(object):
   """
@@ -18,100 +17,100 @@ class MNISTDataHandler(object):
       path - MNIST data path
       data - a list of np.array w/ shape [batch_size, 28, 28, 1]
   """
-  def __init__(self, path, is_train):
+  def __init__(self, path, is_train,config):
     self.is_train = is_train
     self.path = path
-    self.data_alzeimer=[]
-    self.data_healthy=[]
-    def h5py_dataset_iterator(g, prefix=''):
-        for key in g.keys():
-          item = g[key]
-          path = '{}/{}'.format(prefix, key)
-          if isinstance(item, h5py.Dataset): # test for dataset
-            yield (path, item)
-          elif isinstance(item, h5py.Group): # test for group (go down)
-            yield from h5py_dataset_iterator(item, path)
-    if not use_saved_data:
-        self.data_alzeimer = self._get_data("./Medic_data/Alzeimer","./Medic_data/alzeimer_save")
-        self.data_healthy = self._get_data("./Medic_data/Healthy","./Medic_data/healthy_save")
+    self.s_data=[]
+    self.d_data=[]
+    self.config=config
+
+    if not config.use_saved_data:
+        self.s_data,s_data_names = self.get_data(self.config.s_dir)
+        self.d_data,d_data_names = self.get_data(self.config.d_dir)
+        index= 0
+        to_be_deleted=[]
+        for i in s_data_names:
+            if i in d_data_names:
+                index+=1
+            else:
+                to_be_deleted.append(index)
+                index+=1
+        self.s_data=np.delete(self.s_data, to_be_deleted,0)
+        to_be_deleted=[]
+        index=0
+        for i in d_data_names:
+            if i in s_data_names:
+                index+=1
+            else:
+                to_be_deleted.append(index)
+                index+=1
+        self.d_data=np.delete(self.d_data, to_be_deleted,0)
+
+        if self.config.save:
+            with h5py.File('{}.h5'.format(self.config.s_data_filename), 'w') as hf:
+                hf.create_dataset(self.config.s_data_filename,  data=self.s_data)
+            with h5py.File('{}.h5'.format(self.config.d_data_filename), 'w') as hf:
+                hf.create_dataset(self.config.d_data_filename,  data=self.d_data)
     else:
-        with h5py.File('./Medic_data/alzeimer_save.h5', 'r') as hf:
+        def h5py_dataset_iterator(g, prefix=''):
+            for key in g.keys():
+                item = g[key]
+                path = '{}/{}'.format(prefix, key)
+                if isinstance(item, h5py.Dataset): # test for dataset
+                    yield (path, item)
+                elif isinstance(item, h5py.Group): # test for group (go down)
+                    yield from h5py_dataset_iterator(item, path)
+        with h5py.File(self.config.s_data_filename+'.h5', 'r') as hf:
              for (path, dset) in h5py_dataset_iterator(hf):
-                 self.data_alzeimer.append(hf[dset.name][:])
+                 self.s_data=hf[dset.name][:]
 
-        with h5py.File('./Medic_data/healthy_save.h5', 'r') as hf:
+        with h5py.File(self.config.d_data_filename+'.h5', 'r') as hf:
             for (path, dset) in h5py_dataset_iterator(hf):
-                self.data_healthy.append(hf[dset.name][:])
-# def extract_images(filename):
-#     """Extract the images into a 4D uint8 numpy array [index, y, x, depth]."""
-#     print('Extracting', filename)
-#     with gzip.open(filename) as bytestream:
-#         magic = _read32(bytestream)
-#         if magic != 2051:
-#             raise ValueError(
-#                 'Invalid magic number %d in MNIST image file: %s' %
-#                 (magic, filename))
-#         num_images = _read32(bytestream)
-#         rows = _read32(bytestream)
-#         cols = _read32(bytestream)
-#         buf = bytestream.read(rows * cols * num_images)
-#         data = numpy.frombuffer(buf, dtype=numpy.uint8)
-#         data = data.reshape(num_images, rows, cols, 1)
-#         return data
+                self.d_data=hf[dset.name][:]
 
+  def extract_patientnumber(self,filepath):
+      image_name=str(filepath).split("\\")
+      image_name=image_name[len(image_name)-1]
+      num=image_name.split("_")[0][-3:]
+      return num.lstrip("0")
 
-  def _get_data(self,path,filename):
+  def get_data(self,path):
     pathlist = Path(path).glob('**/*.png')
-    png = [list() for _ in range(0,300)]
+    imagelist=[]
+    pathnames=[]
     for image_path in pathlist:
         print(image_path)
+        # maybe interesting at some  point
+        slice_number=str(image_path).split(".")
+        slice_number=slice_number[len(slice_number)-2]
+
+        pathnames.append(self.extract_patientnumber(image_path)+slice_number)
         num = str(image_path).split(".")[2]
         #dropping that alpha channel...
-        res_im=resize(imageio.imread(str(image_path)), [124,124],mode='constant')[:,:,:3]
-        png[int(num)].append(res_im)
-    png = [x for x in png if x != []]
-    for i in range(0,len(png)):
-        png[i]=np.asarray(png[i])
-    #png=np.asarray(png)
-    # im = np.asarray(png)
-    # im = np.expand_dims(im, axis=3)
-    print ('Importing done...',len(png))
-    # with open(filename,'w') as f:
-    #     pickle.dump(png,f)
-    # print("saved list")
+        res_im=resize(color.rgb2gray(imageio.imread(str(image_path))), self.config.im_size,mode='constant')
+        imagelist.append(res_im)
 
-    # values, counts = np.unique(labels, return_counts=True)
-    #
-    # data = []
-    # for i in range(10):
-    #   label = values[i]
-    #   count = counts[i]
-    #   arr = np.empty([count, 28, 28, 1], dtype=np.float32)
-    #   data.append(arr)
-    #
-    # l_iter = [0]*10
-    # for i in range(labels.shape[0]):
-    #   label = labels[i]
-    #   data[label][l_iter[label]] = images[i] / 255.
-    #   l_iter[label] += 1
+        # png[int(num)].append(res_im)
+    # png = [x for x in png if x != []]
+    # for i in range(0,len(png)):
+    #     png[i]=np.asarray(png[i])
+    # #png=np.asarray(png)
+    # # im = np.asarray(png)
+    # # im = np.expand_dims(im, axis=3)
+    # print ('Importing done...',len(png))
+    imagelist=np.asarray(imagelist)
+    imagelist=np.expand_dims(imagelist,axis=4)
+    print(imagelist.shape)
 
-    with h5py.File('{}.h5'.format(filename), 'w') as hf:
-        i=0
-        for k in png:
-          hf.create_dataset(filename+str(i),  data=k)
-          i=1+i
 
-    return png
+    return imagelist, pathnames
 
   def sample_pair(self, batch_size, label=None):
-    rd = random.randint(0, min(len(self.data_alzeimer),len(self.data_healthy))-1)
-    while len(self.data_alzeimer[rd])< rd or len(self.data_healthy[rd])< rd:
-      rd = random.randint(0, min(len(self.data_alzeimer),len(self.data_healthy))-1)
-    #print(rd)
-    #batch_size=min(min(batch_size,len(self.data_alzeimer[rd])),len(self.data_healthy[rd]))
-    choice1 = np.random.choice(self.data_alzeimer[rd].shape[0], batch_size)
-    choice2 = np.random.choice(self.data_healthy[rd].shape[0], batch_size)
-    x = self.data_alzeimer[rd][choice1]
-    y = self.data_healthy[rd][choice2]
+    # print(len(self.s_data))
+    # print(len(self.d_data))
+    choice = np.random.choice(len(self.d_data)-1, batch_size)
+
+    x = self.s_data[choice]
+    y = self.d_data[choice]
 
     return x, y

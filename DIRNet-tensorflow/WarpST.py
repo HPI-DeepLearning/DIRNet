@@ -135,7 +135,7 @@ def WarpST(U, V, out_size, name='DeformableTransformer', **kwargs):
                 U, x_s_flat, y_s_flat, out_size)
 
             output = tf.reshape(
-                input_transformed, 
+                input_transformed,
                 tf.stack([num_batch, out_height, out_width, num_channels]))
             return output
 

@@ -13,7 +13,7 @@ def main():
 
   reg = DIRNet(sess, config, "DIRNet", is_train=False)
   reg.restore(config.ckpt_dir)
-  dh = MNISTDataHandler("MNIST_data", is_train=False)
+  dh = MNISTDataHandler("MNIST_data", is_train=False,config=config)
 
   for i in range(10):
     result_i_dir = config.result_dir+"/{}".format(i)

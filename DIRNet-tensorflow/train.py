@@ -13,15 +13,16 @@ def main():
   mkdir(config.ckpt_dir)
 
   reg = DIRNet(sess, config, "DIRNet", is_train=True)
-  dh = MNISTDataHandler("MNIST_data", is_train=True)
+  # reg.restore(config.ckpt_dir)
+  dh = MNISTDataHandler("MNIST_data", is_train=True,config=config)
 
   for i in range(config.iteration):
     batch_x, batch_y = dh.sample_pair(config.batch_size)
     loss = reg.fit(batch_x, batch_y)
     print("iter {:>6d} : {}".format(i+1, loss))
 
-    if (i+1) % 1000 == 0:
-      reg.deploy(config.tmp_dir, batch_x, batch_y)
+    if (i+1) % config.checkpoint_distance == 0:
+      # reg.deploy(config.tmp_dir, batch_x, batch_y)
       reg.save(config.ckpt_dir)
 
 if __name__ == "__main__":

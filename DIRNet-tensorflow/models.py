@@ -1,5 +1,6 @@
 import tensorflow as tf
 from WarpST import WarpST
+from AffineST import AffineST
 from ops import *
 import scipy.misc
 
@@ -28,7 +29,6 @@ class CNN(object):
         tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
       self.saver = tf.train.Saver(self.var_list)
       self.reuse = True
-
     return x
 
   def save(self, sess, ckpt_path):
@@ -44,7 +44,7 @@ class DIRNet(object):
     self.is_train = is_train
 
     # moving / fixed images
-    im_shape = [config.batch_size] + config.im_size+[3]
+    im_shape = [config.batch_size] + config.im_size+[1]
     self.x = tf.placeholder(tf.float32, im_shape)
     self.y = tf.placeholder(tf.float32, im_shape)
     self.xy = tf.concat([self.x, self.y], 3)
@@ -53,7 +53,11 @@ class DIRNet(object):
 
     # vector map & moved image
     self.v = self.vCNN(self.xy)
-    self.z = WarpST(self.x, self.v, config.im_size)
+    self.z=None
+    if config.use_AffineST:
+        self.z=AffineST(self.x, self.v, config.im_size)
+    else:
+        self.z = WarpST(self.x, self.v, config.im_size)
 
     if self.is_train :
       self.loss = ncc(self.y, self.z)
@@ -76,9 +80,18 @@ class DIRNet(object):
   def deploy(self, dir_path, x, y):
     z = self.sess.run(self.z, {self.x:x, self.y:y})
     for i in range(z.shape[0]):
-      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x[i,:,:,:])
-      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y[i,:,:,:])
-      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z[i,:,:,:])
+      array = np.subtract(x[i,:,:,:],y[i,:,:,:])
+      low_values_flags = array < .8
+      array[low_values_flags] = 0
+      array=array[:,:,0]
+      scipy.misc.imsave(dir_path+"/{:02d}_x-y.tif".format(i+1), array)
+      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x[i,:,:,0])
+      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y[i,:,:,0])
+      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z[i,:,:,0])
+      array = np.subtract(x[i,:,:,:],z[i,:,:,:])
+      low_values_flags = array <.6
+      array[low_values_flags] = 0
+      scipy.misc.imsave(dir_path+"/{:02d}_y-z.tif".format(i+1), array[:,:,0])
 
   def save(self, dir_path):
     self.vCNN.save(self.sess, dir_path+"/model.ckpt")
