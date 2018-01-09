@@ -8,9 +8,15 @@ import mxnet as mx
 import numpy as np
 from PIL import Image
 import scipy.misc
+from os import listdir
+from os.path import isfile, join
 import gzip
 import struct
 from mxnet import nd, autograd
+from os import listdir
+from os.path import isfile, join
+import scipy.ndimage as ndimage
+import scipy.misc as misc
 
 
 
@@ -82,8 +88,8 @@ def get_mnist_data_iterator_two_data_sources(mnistdir='../data/', digit=1):
 def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     def get_iterator_single_digit(data, label):
         one_digit_indices = []  # Contains all indices with images depicting the digit
-        #for index in range(90):  # There might be a faster way to do this
-        for index in range(len(label)):  # There might be a faster way to do this
+        for index in range(90):  # There might be a faster way to do this
+        #for index in range(len(label)):  # There might be a faster way to do this
             if label[index] == digit:
                 one_digit_indices.append(index)
         one_digit_data = data[one_digit_indices]
@@ -97,6 +103,43 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     train_iter = get_iterator_single_digit(mnist['train_data'], mnist['train_label'])
     val_iter = get_iterator_single_digit(mnist['test_data'], mnist['test_label'])
     return train_iter, val_iter
+
+
+def read_cardio_dirs_to_ndarray(path_fixed, path_moving, shape):
+    def find_moving_img(arr, start_idx, fixed_name):
+        # patient035_frame01.nz.10.png
+        patient_id = fixed_name[7:10]
+        slice_id = fixed_name[22:24]
+        for i in range(len(arr)):
+            idx = (i + start_idx) % len(arr)  # iterate through the whole array but dont start at 0
+            moving_name = arr[idx]
+            if patient_id == moving_name[7:10] and slice_id == moving_name[22:24]:
+                return moving_name
+        return None
+
+
+    onlyfiles_fixed = [f for f in listdir(path_fixed) if isfile(join(path_fixed, f))]
+    onlyfiles_moving = [f for f in listdir(path_moving) if isfile(join(path_moving, f))]
+    # out_fix = np.empty(shape=(shape[1], shape[2]))
+    # out_mov = np.empty(shape=(shape[1], shape[2]))
+    arrays_fix = []
+    arrays_mov = []
+    for i, fixed in enumerate(onlyfiles_fixed):
+        if fixed.endswith('.png'):
+            moving = find_moving_img(onlyfiles_moving, i, fixed)
+            assert moving is not None
+
+            abspath = join(path_fixed, fixed)
+            pic_fix = ndimage.imread(abspath, flatten=True)
+            pic_fix = misc.imresize(pic_fix, (shape[0], shape[1]))
+
+            abspath = join(path_moving, moving)
+            pic_mov = ndimage.imread(abspath, flatten=True)
+            pic_mov = misc.imresize(pic_mov, (shape[0], shape[1]))
+            arrays_fix.append(np.stack([pic_fix, pic_mov]))
+            #arrays_mov.append(pic_mov)
+    return arrays_fix
+
 
 def ncc(x, y):
     # mean_x = tf.reduce_mean(x, [1, 2, 3], keep_dims=True)
@@ -169,6 +212,20 @@ def printNaNGradients(grads, thresh=0):
         if hasNan:
             print('\t ' + key + ' has NaN values!')
 
+
+def create_imglist(root_path, pathout=''):
+    onlyfiles = [f for f in listdir(root_path) if isfile(join(root_path, f))]
+    str_out = ''
+    i = 0
+    for filename in onlyfiles:
+        # Format: Tab separated record of index, one or more labels and relative_path_from_root.
+        i += 1
+        if filename.endswith('.png'):
+            str_out += str(i) + '\t1\t/\n'
+    if pathout == '':
+        pathout = root_path+'/imglist.txt'
+    with open(pathout, 'w') as f:
+        f.write(str_out)
 
 
 def pure_batch_norm(X, gamma, beta, eps = 2e-5):
