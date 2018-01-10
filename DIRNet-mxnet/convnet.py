@@ -8,7 +8,7 @@ import mxnet as mx
 import numpy as np
 import os
 import helper as hlp
-import RegistrationIterator as RIter
+import sys
 
 
 def conv_net_regressor(shape, use_additional_pool=False, bn_mom=0.9):
@@ -363,7 +363,19 @@ def predict(executor, iterator):
 
 if __name__ == '__main__':
     cardio_shape = (222, 247)
-    ctx = mx.gpu()
+    if len(sys.argv) == 3:
+        if sys.argv[0] == 'gpu':
+            ctx = mx.gpu()
+        elif sys.argv[0] == 'cpu':
+            ctx = mx.cpu()
+        else:
+            print('first argument has to be gpu or cpu')
+        path_ed = sys.argv[1]
+        path_es = sys.argv[2]
+    else:
+        path_ed = '/home/adrian/Documents/dl2/Cardiac/ED'
+        path_es = '/home/adrian/Documents/dl2/Cardiac/ES'
+        ctx = mx.cpu()
     # mnist_shape = (1, 1, 28, 28)
     # net = get_symbol(mnist_shape)
     #mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
@@ -387,8 +399,7 @@ if __name__ == '__main__':
     #                                  path_root='/home/adrian/Documents/dl2/Cardiac/ED',
     #                                  path_imglist='/home/adrian/Documents/dl2/Cardiac/ES/imglist.txt')
 
-    data = hlp.read_cardio_dirs_to_ndarray(path_moving='/home/mina/Registration/Cardiac/ES',
-                 path_fixed='/home/adrian/Documents/dl2/Cardiac/ED', shape=cardio_shape)
+    data = hlp.read_cardio_dirs_to_ndarray(path_moving=path_es, path_fixed=path_ed, shape=cardio_shape)
     trained_exec = cardiac_training(symbol=net, img_shape=(1, 1, cardio_shape[0], cardio_shape[1]),
                                     epochs=1, ctx=ctx, data=data)
     save_params(executor=trained_exec, symbol=net)
