@@ -105,6 +105,18 @@ def get_mnist_data_iterator(mnistdir='./data/', digit=1):
     return train_iter, val_iter
 
 
+def find_moving_img(arr, start_idx, fixed_name):
+    # patient035_frame01.nz.10.png
+    patient_id = fixed_name[7:10]
+    slice_id = fixed_name[22:24]
+    for i in range(len(arr)):
+        idx = (i + start_idx) % len(arr)  # iterate through the whole array but dont start at 0
+        moving_name = arr[idx]
+        if patient_id == moving_name[7:10] and slice_id == moving_name[22:24]:
+            return moving_name
+    return None
+
+
 def read_cardio_dirs_to_ndarray(path_fixed, path_moving, shape):
     '''
     Reads the fixed (ED) cardio images, looks for a corresponding moving image (ES) by name (same patient, same slice)
@@ -114,16 +126,6 @@ def read_cardio_dirs_to_ndarray(path_fixed, path_moving, shape):
     :param shape: target shape, will rescale all images to the same size
     :return: an array of shape (amount_pairs, 2, shape[0], shape[1]) fixed is in [idx][0] and mov in [idx][1]
     '''
-    def find_moving_img(arr, start_idx, fixed_name):
-        # patient035_frame01.nz.10.png
-        patient_id = fixed_name[7:10]
-        slice_id = fixed_name[22:24]
-        for i in range(len(arr)):
-            idx = (i + start_idx) % len(arr)  # iterate through the whole array but dont start at 0
-            moving_name = arr[idx]
-            if patient_id == moving_name[7:10] and slice_id == moving_name[22:24]:
-                return moving_name
-        return None
 
 
     onlyfiles_fixed = [f for f in listdir(path_fixed) if isfile(join(path_fixed, f))]

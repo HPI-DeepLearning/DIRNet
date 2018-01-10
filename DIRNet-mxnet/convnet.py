@@ -8,6 +8,9 @@ import mxnet as mx
 import numpy as np
 import os
 import helper as hlp
+from os import listdir, mkdir
+from os.path import isfile, join
+import scipy.ndimage as ndimage
 import sys
 
 
@@ -264,7 +267,6 @@ def cardiac_training(symbol, img_shape, data, ctx=mx.gpu(), epochs=10, lr=0.0000
         i = 0
         for batch in data:
             i += 1
-            print(i)
             data_fixed[0][0] = batch[0]
             data_mov[0][0] = batch[1]
             executor.forward(is_train=True, data_fixed=data_fixed, data_moving=data_mov)
@@ -311,6 +313,30 @@ def cardiac_training(symbol, img_shape, data, ctx=mx.gpu(), epochs=10, lr=0.0000
     #     hlp.saveArrayAsImg(stnet.asnumpy()[0][0], './{0}0warped_{0}.png'.format(l))
     #     hlp.saveArrayAsImg(moving.asnumpy()[0][0], './{0}1original_{0}.png'.format(l))
     return executor
+
+
+def cardiac_predict(symbol, data_fixed, data_moving, param_path='./', outpath='./', ctx=mx.gpu()):
+    '''
+    Our own training method for the network. using the low-level simple_bind API
+    Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
+    nearly the same as training on mnist, just different iterators
+    :param symbol:
+    :param train_iter:
+    :return:
+    '''
+    img_shape = (1, 1, np.shape(data_fixed)[0], np.shape(data_fixed)[1])
+    executor = load_params_to_exec(symbol=symbol, shape=np.shape(data_fixed), ctx=ctx, path=param_path)
+    # symbol.simple_bind(ctx=ctx, data_moving=img_shape, data_fixed=img_shape,
+    #                               label_shapes=None, grad_req='null')
+    df = np.empty((1, 1, np.shape(data_fixed)[0], np.shape(data_fixed)[1]))
+    dm = np.empty((1, 1, np.shape(data_fixed)[0], np.shape(data_fixed)[1]))
+    df[0][0] = data_fixed
+    dm[0][0] = data_moving
+    executor.forward(is_train=False, data_fixed=df, data_moving=dm)
+    stnet = executor.outputs[1]
+    fc3 = executor.outputs[2]
+    hlp.saveArrayAsImg(stnet.asnumpy()[0][0], outpath)
+    print("Applied affine transformation with parameters Theta: " + str(fc3))
 
 
 def save_params(symbol, executor, path='./dirnet_params.json'):
@@ -362,27 +388,27 @@ def predict(executor, iterator):
     print("Affine transformation parameters Theta: " + str(fc3))
 
 
-if __name__ == '__main__':
+def train_cardio_wrapper():
     cardio_shape = (222, 247)
     epochs = 1
     if len(sys.argv) == 5:
-        if sys.argv[0] == 'gpu':
+        if sys.argv[1] == 'gpu':
             ctx = mx.gpu()
-        elif sys.argv[0] == 'cpu':
+        elif sys.argv[1] == 'cpu':
             ctx = mx.cpu()
         else:
             print('first argument has to be gpu or cpu')
         epochs = int(sys.argv[2])
-        path_ed = sys.argv[2]
-        path_es = sys.argv[3]
+        path_ed = sys.argv[3]
+        path_es = sys.argv[4]
     else:
         path_ed = '/home/adrian/Documents/dl2/Cardiac/ED'
         path_es = '/home/adrian/Documents/dl2/Cardiac/ES'
         ctx = mx.cpu()
     # mnist_shape = (1, 1, 28, 28)
     # net = get_symbol(mnist_shape)
-    #mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
-    #iterator = hlp.get_mnist_data_iterator(mnistdir='./data/', digit=0)
+    # mnist = get_mnist(mnistdir='./data/')  # or use mnist = mx.test_utils.get_mnist() to download
+    # iterator = hlp.get_mnist_data_iterator(mnistdir='./data/', digit=0)
     # trained_exec = custom_training_simple_bind(symbol=net, epochs=1, ctx=ctx, iterators=iterator)
     # iter = RIter.RegistrationIter(ES_path='/home/adrian/Documents/dl2/Cardiac/ES',
     #              ED_path='/home/adrian/Documents/dl2/Cardiac/ED', shape=cardio_shape)
@@ -406,4 +432,43 @@ if __name__ == '__main__':
     trained_exec = cardiac_training(symbol=net, img_shape=(1, 1, cardio_shape[0], cardio_shape[1]),
                                     epochs=epochs, ctx=ctx, data=data)
     save_params(executor=trained_exec, symbol=net)
-    #loaded_exec = load_params_to_exec(net, ctx=ctx)
+    # loaded_exec = load_params_to_exec(net, ctx=ctx)
+
+
+if __name__ == '__main__':
+    # Set variables
+    cardio_shape = (222, 247)
+    if len(sys.argv) == 4:
+        if sys.argv[1] == 'gpu':
+            ctx = mx.gpu()
+        elif sys.argv[1] == 'cpu':
+            ctx = mx.cpu()
+        else:
+            print('first argument has to be gpu or cpu')
+        epochs = int(sys.argv[2])
+        path_ed = sys.argv[3]
+        path_es = sys.argv[4]
+    else:
+        path_ed = '/home/adrian/Documents/dl2/Cardiac/ED_rescaled'
+        path_es = '/home/adrian/Documents/dl2/Cardiac/ES_rescaled'
+        ctx = mx.cpu()
+    net = conv_net_regressor(shape=(1, 1, cardio_shape[0], cardio_shape[1]), use_additional_pool=True)
+    outdir = '/home/adrian/Documents/dl2/Cardiac/ES_registered'
+    param_path = '/home/adrian/PycharmProjects/DIRNet/dirnet_params.json'
+    # Go through data
+    onlyfiles_fixed = [f for f in listdir(path_ed) if isfile(join(path_ed, f))]
+    onlyfiles_moving = [f for f in listdir(path_es) if isfile(join(path_es, f))]
+    # out_fix = np.empty(shape=(shape[1], shape[2]))
+    # out_mov = np.empty(shape=(shape[1], shape[2]))
+    arrays_fix = []
+    arrays_mov = []
+    for i, fixed in enumerate(onlyfiles_fixed):
+        if fixed.endswith('.png'):
+            moving = hlp.find_moving_img(onlyfiles_moving, i, fixed)
+            assert moving is not None
+
+            abspath = join(path_ed, fixed)
+            pic_fix = ndimage.imread(abspath, flatten=True)
+            abspath = join(path_es, moving)
+            pic_mov = ndimage.imread(abspath, flatten=True)
+            cardiac_predict(symbol=net, data_fixed=pic_fix, data_moving=pic_mov, param_path=param_path, outpath=join(outdir, moving), ctx=ctx)
