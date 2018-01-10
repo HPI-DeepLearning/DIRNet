@@ -363,7 +363,7 @@ def predict(executor, iterator):
 
 if __name__ == '__main__':
     cardio_shape = (222, 247)
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 4:
         if sys.argv[0] == 'gpu':
             ctx = mx.gpu()
         elif sys.argv[0] == 'cpu':
