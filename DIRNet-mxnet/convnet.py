@@ -255,7 +255,7 @@ def cardiac_training(symbol, img_shape, data, ctx=mx.gpu(), epochs=10, lr=0.0000
     for key, arr in args.items():
         Init(key, arr)
     keys = symbol.list_arguments()
-    debug = True
+    debug = False
     data_fixed = np.empty((1, 1, img_shape[2], img_shape[3]))
     data_mov = np.empty((1, 1, img_shape[2], img_shape[3]))
     for epoch in range(epochs):
@@ -328,7 +328,7 @@ def save_params(symbol, executor, path='./dirnet_params.json'):
     #mx.nd.save(path, [arg_arrays, aux_arrays])
 
 
-def load_params_to_exec(symbol, ctx=mx.gpu(), path='./dirnet_params.json'):
+def load_params_to_exec(symbol, shape, ctx=mx.gpu(), path='./dirnet_params.json'):
     save_dict = mx.nd.load(os.path.abspath(path))
     arg_params = {}
     aux_params = {}
@@ -338,7 +338,8 @@ def load_params_to_exec(symbol, ctx=mx.gpu(), path='./dirnet_params.json'):
             arg_params[name] = v
         if tp == 'aux':
             aux_params[name] = v
-    executor = symbol.simple_bind(ctx=ctx, data_moving=(1, 1, 28, 28), data_fixed=(1, 1, 28, 28),
+    executor = symbol.simple_bind(ctx=ctx, data_moving=(1, 1, shape[0], shape[1]),
+                                  data_fixed=(1, 1, shape[0], shape[1]),
                                   label_shapes=None, grad_req='null')
     executor.copy_params_from(arg_params=arg_params, aux_params=aux_params)
     return executor
@@ -363,15 +364,17 @@ def predict(executor, iterator):
 
 if __name__ == '__main__':
     cardio_shape = (222, 247)
-    if len(sys.argv) == 4:
+    epochs = 1
+    if len(sys.argv) == 5:
         if sys.argv[0] == 'gpu':
             ctx = mx.gpu()
         elif sys.argv[0] == 'cpu':
             ctx = mx.cpu()
         else:
             print('first argument has to be gpu or cpu')
-        path_ed = sys.argv[1]
-        path_es = sys.argv[2]
+        epochs = int(sys.argv[2])
+        path_ed = sys.argv[2]
+        path_es = sys.argv[3]
     else:
         path_ed = '/home/adrian/Documents/dl2/Cardiac/ED'
         path_es = '/home/adrian/Documents/dl2/Cardiac/ES'
@@ -401,6 +404,6 @@ if __name__ == '__main__':
 
     data = hlp.read_cardio_dirs_to_ndarray(path_moving=path_es, path_fixed=path_ed, shape=cardio_shape)
     trained_exec = cardiac_training(symbol=net, img_shape=(1, 1, cardio_shape[0], cardio_shape[1]),
-                                    epochs=1, ctx=ctx, data=data)
+                                    epochs=epochs, ctx=ctx, data=data)
     save_params(executor=trained_exec, symbol=net)
-    loaded_exec = load_params_to_exec(net, ctx=ctx)
+    #loaded_exec = load_params_to_exec(net, ctx=ctx)
