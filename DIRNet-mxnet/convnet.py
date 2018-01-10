@@ -387,7 +387,7 @@ if __name__ == '__main__':
     #                                  path_root='/home/adrian/Documents/dl2/Cardiac/ED',
     #                                  path_imglist='/home/adrian/Documents/dl2/Cardiac/ES/imglist.txt')
 
-    data = hlp.read_cardio_dirs_to_ndarray(path_moving='/home/adrian/Documents/dl2/Cardiac/ES',
+    data = hlp.read_cardio_dirs_to_ndarray(path_moving='/home/mina/Registration/Cardiac/ES',
                  path_fixed='/home/adrian/Documents/dl2/Cardiac/ED', shape=cardio_shape)
     trained_exec = cardiac_training(symbol=net, img_shape=(1, 1, cardio_shape[0], cardio_shape[1]),
                                     epochs=1, ctx=ctx, data=data)
