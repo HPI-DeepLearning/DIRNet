@@ -19,6 +19,7 @@ class DIRNetDatahandler(object):
     def __init__(self, config):
         self.s_data = []
         self.d_data = []
+        self.labels=[]
         self.config = config
 
         # read data from folder
@@ -26,17 +27,23 @@ class DIRNetDatahandler(object):
             print("getting data")
             self.s_data, s_data_names = self.get_data(self.config.s_dir)
             self.d_data, d_data_names = self.get_data(self.config.d_dir)
+            label_names,labels_raw = self.load_labels(self.config.label_path)
+
             index = 0
+
 
             # delete files that are only contained in one of the folders
             to_be_deleted = []
             for i in s_data_names:
-                if i in d_data_names:
+                if i in d_data_names and i in label_names:
                     index += 1
+
+                    self.labels.append(labels_raw[label_names.index(i)])
                 else:
                     to_be_deleted.append(index)
                     index += 1
             self.s_data = np.delete(self.s_data, to_be_deleted, 0)
+            self.labels=np.asarray(self.labels)
 
             # delete files that are only contained in one of the folders
             to_be_deleted = []
@@ -77,6 +84,33 @@ class DIRNetDatahandler(object):
                 for (path, dset) in h5py_dataset_iterator(hf):
                     self.d_data = hf[dset.name][:]
 
+
+    def load_labels(self,path):
+        """
+
+        :param path: path to label file
+        :type path: string
+        :return: pathnames and labels
+        :rtype: list,list
+        """
+        pathnames =[]
+        labels=[]
+
+        with open(path) as label_f:
+            label_data=label_f.readlines()
+            for line in label_data:
+                if line is not "":
+                    line=line.split(',')
+                    slice_number=line[0].split('.')
+                    slice_number = slice_number[len(slice_number) - 2]
+                    print((line[0].split(".")[0].split('_')[0])+ "_" + slice_number)
+                    pathnames.append((line[0].split(".")[0].split('_')[0])+ "_" + slice_number)
+                    labels.append(line[1])
+            return pathnames,labels
+
+
+
+
     def extract_patientnumber(self, filepath):
         '''
         extract patient number from  filename
@@ -104,8 +138,8 @@ class DIRNetDatahandler(object):
             # maybe interesting at some  point
             slice_number = str(image_path).split(".")
             slice_number = slice_number[len(slice_number) - 2]
-
-            pathnames.append(self.extract_patientnumber(image_path) + slice_number)
+            print(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0] + "_" + slice_number)
+            pathnames.append(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0] + "_" + slice_number)
             num = str(image_path).split(".")[2]
 
             # load images from file; rgb-> grayscale; resize to size defined in config.im_size
