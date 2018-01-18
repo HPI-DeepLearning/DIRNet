@@ -3,6 +3,7 @@ from WarpST import WarpST
 from AffineST import AffineST
 from ops import *
 import scipy.misc
+from scipy import signal
 
 class CNN(object):
   def __init__(self, name, is_train):
@@ -23,6 +24,10 @@ class CNN(object):
       x = tf.nn.avg_pool(x, [1,2,2,1], [1,2,2,1], "SAME")
       x = conv2d(x, "out2", 2, 3, 1,
         "SAME", False, None, self.is_train)
+      x = conv2d(x, "out3", 2, 3, 1,
+        "SAME", False, None, self.is_train)
+      x = tf.nn.avg_pool(x, [1,2,2,1], [1,2,2,1], "SAME")
+
 
     if self.reuse is None:
       self.var_list = tf.get_collection(
@@ -61,7 +66,7 @@ class DIRNet(object):
 
     if self.is_train :
       self.loss = ncc(self.y, self.z)
-      #self.loss = mse(self.y, self.z)
+      # self.loss = mse(self.y, self.z)
 
       self.optim = tf.train.AdamOptimizer(config.lr)
       self.train = self.optim.minimize(
@@ -77,21 +82,63 @@ class DIRNet(object):
       {self.x:batch_x, self.y:batch_y})
     return loss
 
+  def calc_rmse(self,x, y):
+    '''
+    calculates the root mean squared error of two arrays
+    :param x:
+    :param y:
+    :return:
+    '''
+    error = np.subtract(x, y)
+    squared = np.square(error)
+    avg = np.average(squared)
+    rooted = np.sqrt(avg)
+    return rooted
+
+  def calc_rmse_all(self,x,y,dir_path):
+    rmse=0
+    rmse_old_res=0
+    counter=0
+    for i in range(x.shape[0]):
+
+      z = self.sess.run(self.z, {self.x:np.expand_dims(x[i,:,:,:],0), self.y:np.expand_dims(y[i,:,:,:],0)})
+      mean=np.mean(z[0,:,:,0])
+      z=z-mean
+      x_new=x[i,:,:,0]-np.mean(x[i,:,:,0])
+      y_new=y[i,:,:,0]-np.mean(y[i,:,:,0])
+      rmse_old=self.calc_rmse( y_new,x_new)
+      rmse_curr=self.calc_rmse( x_new,z[0,:,:,0])
+      # if abs(rmse_curr-rmse_old)<3:
+      counter+=1
+      rmse+=rmse_curr
+      rmse_old_res+=rmse_old
+      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x[i,:,:,0])
+      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y[i,:,:,0])
+      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z[0,:,:,0])
+    print("rmse_old: "+str(rmse_old_res/counter))
+    print("rmse_new: "+str(rmse/counter))
+    return rmse/y.shape[0]
+    return rmse
+
   def deploy(self, dir_path, x, y):
     z = self.sess.run(self.z, {self.x:x, self.y:y})
     for i in range(z.shape[0]):
-      array = np.subtract(x[i,:,:,:],y[i,:,:,:])
+      z_new=z[i,:,:,0]-np.mean(z[i,:,:,0])
+      x_new=x[i,:,:,0]-np.mean(x[i,:,:,0])
+      y_new=y[i,:,:,0]-np.mean(y[i,:,:,0])
+      print(np.mean(x_new))
+      array = np.subtract(x_new,y_new)
       low_values_flags = array < .8
       array[low_values_flags] = 0
-      array=array[:,:,0]
+      array=array[:,:]
       scipy.misc.imsave(dir_path+"/{:02d}_x-y.tif".format(i+1), array)
-      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x[i,:,:,0])
-      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y[i,:,:,0])
-      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z[i,:,:,0])
-      array = np.subtract(x[i,:,:,:],z[i,:,:,:])
-      low_values_flags = array <.6
+      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x_new)
+      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y_new)
+      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z_new)
+      array = np.subtract(z_new,y_new)
+      low_values_flags = array <.8
       array[low_values_flags] = 0
-      scipy.misc.imsave(dir_path+"/{:02d}_y-z.tif".format(i+1), array[:,:,0])
+      scipy.misc.imsave(dir_path+"/{:02d}_z-y.tif".format(i+1), array[:,:])
 
   def save(self, dir_path):
     self.vCNN.save(self.sess, dir_path+"/model.ckpt")
