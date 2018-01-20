@@ -19,10 +19,10 @@ def main():
 
     for i in range(config.iteration):
         # create new random batch
-        batch_x, batch_y = dh.sample_pair(config.batch_size)
+        batch_x, batch_y, batch_labels = dh.sample_pair(config.batch_size)
 
         # run sess => minimize loss
-        loss = reg.fit(batch_x, batch_y)
+        loss = reg.fit(batch_x, batch_y,batch_labels)
 
         print("iter {:>6d} : {}".format(i + 1, loss))
 

@@ -14,10 +14,11 @@ def main():
 
     reg = DIRNet(sess, config, "DIRNet", is_train=False)
     reg.restore(config.ckpt_dir)
-    dh = DIRNetDatahandler( config=config)
+    dh = DIRNetDatahandler(config=config)
 
-    print(reg.calc_rmse_all(dh.s_data, dh.d_data, config.result_dir + "/",save_images=False))
-
+    # print(reg.calc_rmse_all(dh.s_data, dh.d_data, config.result_dir + "/",save_images=False))
+    batch_x, batch_y, batch_labels = dh.sample_pair(config.batch_size)
+    reg.deploy_with_labels(batch_x, batch_y, batch_labels)
     # to use the deploy func from models
 
     # for i in range(10):

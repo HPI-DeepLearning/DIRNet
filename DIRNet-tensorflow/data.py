@@ -19,18 +19,15 @@ class DIRNetDatahandler(object):
     def __init__(self, config):
         self.s_data = []
         self.d_data = []
-        self.labels=[]
         self.config = config
-
+        self.labels = []
         # read data from folder
         if not config.use_saved_data:
             print("getting data")
             self.s_data, s_data_names = self.get_data(self.config.s_dir)
             self.d_data, d_data_names = self.get_data(self.config.d_dir)
-            label_names,labels_raw = self.load_labels(self.config.label_path)
-
+            label_names, labels_raw = self.load_labels(self.config.label_path)
             index = 0
-
 
             # delete files that are only contained in one of the folders
             to_be_deleted = []
@@ -38,12 +35,12 @@ class DIRNetDatahandler(object):
                 if i in d_data_names and i in label_names:
                     index += 1
 
-                    self.labels.append(labels_raw[label_names.index(i)])
+                    self.labels.append(int(labels_raw[label_names.index(i)]))
                 else:
                     to_be_deleted.append(index)
                     index += 1
             self.s_data = np.delete(self.s_data, to_be_deleted, 0)
-            self.labels=np.asarray(self.labels)
+            self.labels = np.asarray(self.labels)
 
             # delete files that are only contained in one of the folders
             to_be_deleted = []
@@ -62,6 +59,8 @@ class DIRNetDatahandler(object):
                     hf.create_dataset(self.config.s_data_filename, data=self.s_data)
                 with h5py.File('{}.h5'.format(self.config.d_data_filename), 'w') as hf:
                     hf.create_dataset(self.config.d_data_filename, data=self.d_data)
+                with h5py.File('{}.h5'.format(self.config.label_filename), 'w') as hf:
+                    hf.create_dataset(self.config.label_filename, data=self.labels)
         else:
 
             # load numpy arrays from .h5 files
@@ -84,8 +83,11 @@ class DIRNetDatahandler(object):
                 for (path, dset) in h5py_dataset_iterator(hf):
                     self.d_data = hf[dset.name][:]
 
+            with h5py.File(self.config.label_filename + '.h5', 'r') as hf:
+                for (path, dset) in h5py_dataset_iterator(hf):
+                    self.labels = hf[dset.name][:]
 
-    def load_labels(self,path):
+    def load_labels(self, path):
         """
 
         :param path: path to label file
@@ -93,23 +95,20 @@ class DIRNetDatahandler(object):
         :return: pathnames and labels
         :rtype: list,list
         """
-        pathnames =[]
-        labels=[]
+        pathnames = []
+        labels = []
 
         with open(path) as label_f:
-            label_data=label_f.readlines()
+            label_data = label_f.readlines()
             for line in label_data:
                 if line is not "":
-                    line=line.split(',')
-                    slice_number=line[0].split('.')
+                    line = line.split(',')
+                    slice_number = line[0].split('.')
                     slice_number = slice_number[len(slice_number) - 2]
-                    print((line[0].split(".")[0].split('_')[0])+ "_" + slice_number)
-                    pathnames.append((line[0].split(".")[0].split('_')[0])+ "_" + slice_number)
+                    print((line[0].split(".")[0].split('_')[0]) + "_" + slice_number)
+                    pathnames.append((line[0].split(".")[0].split('_')[0]) + "_" + slice_number)
                     labels.append(line[1])
-            return pathnames,labels
-
-
-
+            return pathnames, labels
 
     def extract_patientnumber(self, filepath):
         '''
@@ -138,8 +137,18 @@ class DIRNetDatahandler(object):
             # maybe interesting at some  point
             slice_number = str(image_path).split(".")
             slice_number = slice_number[len(slice_number) - 2]
-            print(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0] + "_" + slice_number)
-            pathnames.append(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0] + "_" + slice_number)
+            if str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0].startswith("nz"):
+                print(str(image_path).split(".")[len(slice_number) - 6].split('\\')[-1].split('_')[
+                          0] + "_" + slice_number)
+                pathnames.append(
+                    str(image_path).split(".")[len(slice_number) - 6].split('\\')[-1].split('_')[
+                        0] + "_" + slice_number)
+            else:
+                print(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[
+                          0] + "_" + slice_number)
+                pathnames.append(
+                    str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[
+                        0] + "_" + slice_number)
             num = str(image_path).split(".")[2]
 
             # load images from file; rgb-> grayscale; resize to size defined in config.im_size
@@ -159,11 +168,12 @@ class DIRNetDatahandler(object):
         '''
         sample random pairs of moving and fixed images
         :param batch_size: number of moving/fixed images to be fixed
-        return: numpy arrays x and y with shape [batch_size, height, width,color_channels]
+        return: numpy arrays x and y with shape [batch_size, height, width,color_channels] and numpy array with all labels
         '''
         choice = np.random.choice(len(self.d_data) - 1, batch_size)
 
         x = self.s_data[choice]
         y = self.d_data[choice]
+        labels = self.labels[choice]
 
-        return x, y
+        return x, y, labels
