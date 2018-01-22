@@ -1,4 +1,13 @@
 .data/*
 .data/
+DIRNet-tensorflow/ckpt/
+DIRNet-tensorflow/ckpt/*
+DIRNet-tensorflow/tf_impl_rslt_all/*
+DIRNet-tensorflow/tf_impl_rslt_all/
+DIRNet-tensorflow/tf_impl_rslt_fix/*
+DIRNet-tensorflow/tf_impl_rslt_fix/
+DIRNet-tensorflow/tf_impl_rslt_mov/
+DIRNet-tensorflow/tf_impl_rslt_mov/*
+DIRNet-tensorflow/ckpt/
 #Pycharm stuff
 .idea/*
