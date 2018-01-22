@@ -4,15 +4,15 @@ from scipy import signal
 import cv2
 from scipy.ndimage.filters import convolve
 
-#opencv is only used for loading right now
-image1 = cv2.imread(image1..)
-image2 = cv2.imread(image2...)
-#call to MultiScaleSSIM needs to have a batch dimension
-image1_1=np.expand_dims(image1,axis=0)
-image2_1=np.expand_dims(image2,axis=0)
-#mse and ssim need to get grayscale images
-image1=cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-image2=cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
+# #opencv is only used for loading right now
+# image1 = cv2.imread(image1..)
+# image2 = cv2.imread(image2...)
+# #call to MultiScaleSSIM needs to have a batch dimension
+# image1_1=np.expand_dims(image1,axis=0)
+# image2_1=np.expand_dims(image2,axis=0)
+# #mse and ssim need to get grayscale images
+# image1=cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+# image2=cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
 
 
 def mse(imageA, imageB):
@@ -118,6 +118,6 @@ def _SSIMForMultiScale(img1, img2, max_val=255, filter_size=11,
     return ssim, cs
 
 
-print('ms-ssim: {}'.format(MultiScaleSSIM(image1_1,image2_1)))
-print('ssim: {}'.format(1-ssim(image1, image2)))
-print('mse: {}'.format(mse(image1,image2)))
+# print('ms-ssim: {}'.format(MultiScaleSSIM(image1_1,image2_1)))
+# print('ssim: {}'.format(1-ssim(image1, image2)))
+# print('mse: {}'.format(mse(image1,image2)))

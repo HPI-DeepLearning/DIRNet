@@ -315,7 +315,7 @@ def cardiac_training(symbol, img_shape, data, ctx=mx.gpu(), epochs=10, lr=0.0000
     return executor
 
 
-def cardiac_predict(symbol, data_fixed, data_moving, param_path='./', outpath='./', ctx=mx.gpu()):
+def cardiac_predict(executor, data_fixed, data_moving, outpath='./'):
     '''
     Our own training method for the network. using the low-level simple_bind API
     Many code snippets are from https://github.com/apache/incubator-mxnet/blob/5ff545f2345f9b607b81546a168665bd63d02d9f/example/notebooks/simple_bind.ipynb
@@ -325,7 +325,6 @@ def cardiac_predict(symbol, data_fixed, data_moving, param_path='./', outpath='.
     :return:
     '''
     img_shape = (1, 1, np.shape(data_fixed)[0], np.shape(data_fixed)[1])
-    executor = load_params_to_exec(symbol=symbol, shape=np.shape(data_fixed), ctx=ctx, path=param_path)
     # symbol.simple_bind(ctx=ctx, data_moving=img_shape, data_fixed=img_shape,
     #                               label_shapes=None, grad_req='null')
     df = np.empty((1, 1, np.shape(data_fixed)[0], np.shape(data_fixed)[1]))
@@ -438,6 +437,7 @@ def train_cardio_wrapper():
 if __name__ == '__main__':
     # Set variables
     cardio_shape = (222, 247)
+    shape_for_net = (1, 1, cardio_shape[0], cardio_shape[1])
     if len(sys.argv) == 4:
         if sys.argv[1] == 'gpu':
             ctx = mx.gpu()
@@ -452,12 +452,14 @@ if __name__ == '__main__':
         path_ed = '/home/adrian/Documents/dl2/Cardiac/ED_rescaled'
         path_es = '/home/adrian/Documents/dl2/Cardiac/ES_rescaled'
         ctx = mx.cpu()
-    net = conv_net_regressor(shape=(1, 1, cardio_shape[0], cardio_shape[1]), use_additional_pool=True)
+    net = conv_net_regressor(shape=shape_for_net, use_additional_pool=True)
     outdir = '/home/adrian/Documents/dl2/Cardiac/ES_registered'
     param_path = '/home/adrian/PycharmProjects/DIRNet/dirnet_params.json'
     # Go through data
     onlyfiles_fixed = [f for f in listdir(path_ed) if isfile(join(path_ed, f))]
     onlyfiles_moving = [f for f in listdir(path_es) if isfile(join(path_es, f))]
+
+    executor = load_params_to_exec(symbol=net, shape=shape_for_net, ctx=ctx, path=param_path)
     # out_fix = np.empty(shape=(shape[1], shape[2]))
     # out_mov = np.empty(shape=(shape[1], shape[2]))
     arrays_fix = []
@@ -471,4 +473,4 @@ if __name__ == '__main__':
             pic_fix = ndimage.imread(abspath, flatten=True)
             abspath = join(path_es, moving)
             pic_mov = ndimage.imread(abspath, flatten=True)
-            cardiac_predict(symbol=net, data_fixed=pic_fix, data_moving=pic_mov, param_path=param_path, outpath=join(outdir, moving), ctx=ctx)
+            cardiac_predict(symbol=net, data_fixed=pic_fix, data_moving=pic_mov, outpath=join(outdir, moving), ctx=ctx)

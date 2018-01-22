@@ -1,7 +1,7 @@
 import numpy as np
 import gzip
 from pathlib import Path
-import imageio
+#import imageio
 from skimage.transform import resize
 from skimage import color
 import scipy.misc
@@ -12,7 +12,7 @@ import h5py
 
 class DIRNetDatahandler(object):
     '''
-    calculates the root mean squared error of two arrays
+    reads the data
     :param config: config object
     '''
 
@@ -116,8 +116,10 @@ class DIRNetDatahandler(object):
         :param filepath: path to file
         return: patientnumber
         '''
-
-        image_name = str(filepath).split("\\")
+        if self.config.os_is_windows:
+            image_name = str(filepath).split("\\")
+        else:
+            image_name = str(filepath).split("/")
         image_name = image_name[len(image_name) - 1]
         num = image_name.split("_")[0][-3:]
         return num.lstrip("0")
@@ -132,27 +134,32 @@ class DIRNetDatahandler(object):
         pathlist = Path(path).glob('**/*.png')
         imagelist = []
         pathnames = []
+        if self.config.os_is_windows:
+            splitchar = '\\'
+        else:
+            splitchar = '/'
         for image_path in pathlist:
             print(image_path)
             # maybe interesting at some  point
             slice_number = str(image_path).split(".")
             slice_number = slice_number[len(slice_number) - 2]
-            if str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[0].startswith("nz"):
-                print(str(image_path).split(".")[len(slice_number) - 6].split('\\')[-1].split('_')[
+            if str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[0].startswith("nz"):
+                print(str(image_path).split(".")[len(slice_number) - 6].split(splitchar)[-1].split('_')[
                           0] + "_" + slice_number)
                 pathnames.append(
-                    str(image_path).split(".")[len(slice_number) - 6].split('\\')[-1].split('_')[
+                    str(image_path).split(".")[len(slice_number) - 6].split(splitchar)[-1].split('_')[
                         0] + "_" + slice_number)
             else:
-                print(str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[
+                print(str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[
                           0] + "_" + slice_number)
                 pathnames.append(
-                    str(image_path).split(".")[len(slice_number) - 5].split('\\')[-1].split('_')[
+                    str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[
                         0] + "_" + slice_number)
             num = str(image_path).split(".")[2]
 
             # load images from file; rgb-> grayscale; resize to size defined in config.im_size
-            res_im = resize(color.rgb2gray(imageio.imread(str(image_path))), self.config.im_size, mode='constant')
+            # res_im = resize(color.rgb2gray(imageio.imread(str(image_path))), self.config.im_size, mode='constant')
+            res_im = ndimage.imread(str(image_path), flatten=True)
             imagelist.append(res_im)
 
         # list to numpy array
