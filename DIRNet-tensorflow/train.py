@@ -14,14 +14,22 @@ def main():
 
   reg = DIRNet(sess, config, "DIRNet", is_train=True)
   # reg.restore(config.ckpt_dir)
-  dh = MNISTDataHandler("MNIST_data", is_train=True,config=config)
+  print('start reading data')
+  dh = MNISTDataHandler("MNIST_data", is_train=True, config=config)
 
-  for i in range(config.iteration):
-    batch_x, batch_y = dh.sample_pair(config.batch_size)
-    loss = reg.fit(batch_x, batch_y)
-    print("iter {:>6d} : {}".format(i+1, loss))
 
-    if (i+1) % config.checkpoint_distance == 0:
+  for epoch in range(17):
+    loss_sum = 0
+    for i in range(833):
+      batch_x, batch_y = dh.get_pair_by_idx(i)
+      # loss = reg.fit((1, batch_x[0], batch_x[1], batch_x[2]),
+      #                (1, batch_y[0], batch_y[1], batch_y[2]))
+      loss = reg.fit(batch_x, batch_y)
+      loss_sum += loss
+    print("iter {:>6d} : {}".format(epoch, loss_sum/833))
+
+    if (epoch+1) % 5 == 0:
+    # if (epoch+1) % config.checkpoint_distance == 0:
       # reg.deploy(config.tmp_dir, batch_x, batch_y)
       reg.save(config.ckpt_dir)
 

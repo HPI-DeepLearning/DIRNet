@@ -1,9 +1,10 @@
 import numpy as np
 import gzip
 from pathlib import Path
-import imageio
+# import imageio
 from skimage.transform import resize
 from skimage import color
+import scipy.ndimage as ndimage
 import scipy.misc
 from config import get_config
 import random
@@ -27,6 +28,8 @@ class MNISTDataHandler(object):
     if not config.use_saved_data:
         self.s_data,s_data_names = self.get_data(self.config.s_dir)
         self.d_data,d_data_names = self.get_data(self.config.d_dir)
+        # print('len of s_data: ' + str(s_data_names))
+        # print('len of d_data: ' + str(d_data_names))
         index= 0
         to_be_deleted=[]
         for i in s_data_names:
@@ -36,6 +39,7 @@ class MNISTDataHandler(object):
                 to_be_deleted.append(index)
                 index+=1
         self.s_data=np.delete(self.s_data, to_be_deleted,0)
+        print('len of to_be_deleted: ' + str(len(to_be_deleted)))
         to_be_deleted=[]
         index=0
         for i in d_data_names:
@@ -69,7 +73,7 @@ class MNISTDataHandler(object):
                 self.d_data=hf[dset.name][:]
 
   def extract_patientnumber(self,filepath):
-      image_name=str(filepath).split("\\")
+      image_name=str(filepath).split("/")
       image_name=image_name[len(image_name)-1]
       num=image_name.split("_")[0][-3:]
       return num.lstrip("0")
@@ -87,7 +91,8 @@ class MNISTDataHandler(object):
         pathnames.append(self.extract_patientnumber(image_path)+slice_number)
         num = str(image_path).split(".")[2]
         #dropping that alpha channel...
-        res_im=resize(color.rgb2gray(imageio.imread(str(image_path))), self.config.im_size,mode='constant')
+        #res_im=resize(color.rgb2gray(imageio.imread(str(image_path))), self.config.im_size,mode='constant')
+        res_im = ndimage.imread(str(image_path), flatten=True)
         imagelist.append(res_im)
 
         # png[int(num)].append(res_im)
@@ -112,5 +117,11 @@ class MNISTDataHandler(object):
 
     x = self.s_data[choice]
     y = self.d_data[choice]
+
+    return x, y
+
+  def get_pair_by_idx(self, idx):
+    x = self.s_data[np.expand_dims(idx, 0)]
+    y = self.d_data[np.expand_dims(idx, 0)]
 
     return x, y

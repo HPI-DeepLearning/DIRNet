@@ -24,8 +24,8 @@ class CNN(object):
       x = tf.nn.avg_pool(x, [1,2,2,1], [1,2,2,1], "SAME")
       x = conv2d(x, "out2", 2, 3, 1,
         "SAME", False, None, self.is_train)
-      x = conv2d(x, "out3", 2, 3, 1,
-        "SAME", False, None, self.is_train)
+      # x = conv2d(x, "out3", 2, 3, 1,
+      #   "SAME", False, None, self.is_train)
       x = tf.nn.avg_pool(x, [1,2,2,1], [1,2,2,1], "SAME")
 
 
@@ -98,25 +98,29 @@ class DIRNet(object):
   def calc_rmse_all(self,x,y,dir_path):
     rmse=0
     rmse_old_res=0
+    rmse_orig =0
     counter=0
     for i in range(x.shape[0]):
 
-      z = self.sess.run(self.z, {self.x:np.expand_dims(x[i,:,:,:],0), self.y:np.expand_dims(y[i,:,:,:],0)})
-      mean=np.mean(z[0,:,:,0])
-      z=z-mean
+      w = self.sess.run(self.z, {self.x:np.expand_dims(x[i,:,:,:],0), self.y:np.expand_dims(y[i,:,:,:],0)})
+      mean=np.mean(w[0,:,:,0])
+      z=w-mean
       x_new=x[i,:,:,0]-np.mean(x[i,:,:,0])
       y_new=y[i,:,:,0]-np.mean(y[i,:,:,0])
       rmse_old=self.calc_rmse( y_new,x_new)
+      rmse_orig+=self.calc_rmse(y,x)
       rmse_curr=self.calc_rmse( x_new,z[0,:,:,0])
       # if abs(rmse_curr-rmse_old)<3:
       counter+=1
       rmse+=rmse_curr
       rmse_old_res+=rmse_old
-      scipy.misc.imsave(dir_path+"/{:02d}_x.tif".format(i+1), x[i,:,:,0])
-      scipy.misc.imsave(dir_path+"/{:02d}_y.tif".format(i+1), y[i,:,:,0])
-      scipy.misc.imsave(dir_path+"/{:02d}_z.tif".format(i+1), z[0,:,:,0])
+      # scipy.misc.imsave(name=dir_path+"/{:02d}_x.png".format(i+1), arr=x[i,:,:,0])
+      # scipy.misc.imsave(name=dir_path+"/{:02d}_y.png".format(i+1), arr=y[i,:,:,0])
+      # scipy.misc.imsave(name=dir_path+"/{:02d}_z.png".format(i+1), arr=z[0,:,:,0])
+      scipy.misc.imsave(name=dir_path+"/{:02d}_w.png".format(i+1), arr=w[0,:,:,0])
     print("rmse_old: "+str(rmse_old_res/counter))
     print("rmse_new: "+str(rmse/counter))
+    print("rmse_orig: "+str(rmse_orig/counter))
     return rmse/y.shape[0]
     return rmse
 
