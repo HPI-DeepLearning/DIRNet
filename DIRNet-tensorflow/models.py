@@ -223,9 +223,10 @@ class DIRNet(object):
         :type labels: numpy array [batch_size]
         """
         z = self.sess.run([[self.prediction], self.z], {self.x: x, self.y: y})
-        print(z[1].shape)
+        # print(z[0])
         for i in range(labels.shape[0]):
             print("label: ", labels[i], "prediction: ", z[0][i][0])
+        return z[0][i][0]
 
     def deploy(self, dir_path, x, y):
         '''
