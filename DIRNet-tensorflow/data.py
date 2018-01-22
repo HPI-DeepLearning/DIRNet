@@ -175,7 +175,7 @@ class DIRNetDatahandler(object):
     def sample_pair(self, batch_size):
         '''
         sample random pairs of moving and fixed images
-        :param batch_size: number of moving/fixed images to be fixed
+        :param batch_size: number of moving/fixed images to be retrieved
         return: numpy arrays x and y with shape [batch_size, height, width,color_channels] and numpy array with all labels
         '''
         choice = np.random.choice(len(self.d_data) - 1, batch_size)
@@ -183,5 +183,19 @@ class DIRNetDatahandler(object):
         x = self.s_data[choice]
         y = self.d_data[choice]
         labels = self.labels[choice]
+
+        return x, y, labels
+
+    def get_pair_by_idx(self, idx, batch_size=1):
+        '''
+        sample a batch of pairs of moving and fixed images and label, starting by the pair at the index.
+        If index+batch_size is not a valid index, the missing ones are sampled starting at index 0
+        :param batch_size: number of moving/fixed images images to be retrieved
+        :param idx: index in the data from where the samples should be retrived.
+        return: numpy arrays x and y with shape [batch_size, height, width,color_channels] and numpy array with all labels
+        '''
+        x = self.s_data[np.expand_dims(idx, 0)]
+        y = self.d_data[np.expand_dims(idx, 0)]
+        labels = self.labels[np.expand_dims(idx, 0)]
 
         return x, y, labels

@@ -125,7 +125,7 @@ class DIRNet(object):
 
         if self.is_train:
             # loss definition and weighting of the 2 loss functions
-            self.loss = ncc(self.x, self.y) + self.disease_loss(self.labels, self.d_features)
+            self.loss = ncc(self.x, self.y) - self.disease_loss(self.labels, self.d_features)
             # self.loss = mse(self.y, self.z)
 
             self.optim = tf.train.AdamOptimizer(config.lr)
@@ -140,7 +140,7 @@ class DIRNet(object):
         _, loss = \
             self.sess.run([self.train, self.loss],
                           {self.x: batch_x, self.y: batch_y, self.labels: batch_labels})
-        return loss
+        return loss, self.prediction
 
     def disease_loss(self, labels, logits):
         """
