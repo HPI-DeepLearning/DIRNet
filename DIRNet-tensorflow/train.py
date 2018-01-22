@@ -28,7 +28,9 @@ def main():
             #                (1, batch_y[0], batch_y[1], batch_y[2]))
             loss, prediction = reg.fit(batch_x, batch_y, batch_labels)
             loss_sum += loss
-            if prediction == batch_labels:
+            prediction = int(prediction[0])
+            truth = int(batch_labels[0])
+            if prediction == truth:
                 acc += 1
         print("iter {0}: Loss: {1:.4f} Acc: {2:.4f}".format(epoch, loss_sum / amnt_pics, acc / amnt_pics))
 

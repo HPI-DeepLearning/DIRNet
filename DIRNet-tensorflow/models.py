@@ -137,10 +137,10 @@ class DIRNet(object):
         self.sess.run(tf.global_variables_initializer())
 
     def fit(self, batch_x, batch_y, batch_labels):
-        _, loss = \
-            self.sess.run([self.train, self.loss],
+        _, loss, pred = \
+            self.sess.run([self.train, self.loss, self.prediction],
                           {self.x: batch_x, self.y: batch_y, self.labels: batch_labels})
-        return loss, self.prediction
+        return loss, pred
 
     def disease_loss(self, labels, logits):
         """

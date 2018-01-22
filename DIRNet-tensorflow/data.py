@@ -197,5 +197,5 @@ class DIRNetDatahandler(object):
         x = self.s_data[np.expand_dims(idx, 0)]
         y = self.d_data[np.expand_dims(idx, 0)]
         labels = self.labels[np.expand_dims(idx, 0)]
-
+        # :TODO: adjust for batchsize other than 1
         return x, y, labels
