@@ -2,6 +2,7 @@ import numpy as np
 import gzip
 from pathlib import Path
 #import imageio
+import scipy.ndimage as ndimage
 from skimage.transform import resize
 from skimage import color
 import scipy.misc
