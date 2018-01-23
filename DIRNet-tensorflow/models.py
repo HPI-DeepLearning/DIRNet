@@ -222,11 +222,12 @@ class DIRNet(object):
         :param labels: corresponding labels
         :type labels: numpy array [batch_size]
         """
-        z = self.sess.run([[self.prediction], self.z], {self.x: x, self.y: y})
+        pred, transformed = self.sess.run([self.prediction, self.z], {self.x: x, self.y: y})
         # print(z[0])
-        for i in range(labels.shape[0]):
-            print("label: ", labels[i], "prediction: ", z[0][i][0])
-        return z[0][i][0]
+        pred = int(pred[0])
+        # for i in range(labels.shape[0]):
+        #     print("label: ", labels[i], "prediction: ", pred)
+        return pred
 
     def deploy(self, dir_path, x, y):
         '''
@@ -260,7 +261,7 @@ class DIRNet(object):
             scipy.misc.imsave(dir_path + "/{:02d}_z-y.tif".format(i + 1), array[:, :])
 
     def save(self, dir_path):
-        self.vCNN.save(self.sess, dir_path + "/model.ckpt")
+        self.ClassifierNetwork.save(self.sess, dir_path + "/model.ckpt")
 
     def restore(self, dir_path):
-        self.vCNN.restore(self.sess, dir_path + "/model.ckpt")
+        self.ClassifierNetwork.restore(self.sess, dir_path + "/model.ckpt")

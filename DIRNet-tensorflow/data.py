@@ -12,11 +12,11 @@ import h5py
 
 
 class DIRNetDatahandler(object):
+
     '''
     reads the data
     :param config: config object
     '''
-
     def __init__(self, config):
         self.s_data = []
         self.d_data = []
@@ -54,6 +54,26 @@ class DIRNetDatahandler(object):
                     index += 1
             self.d_data = np.delete(self.d_data, to_be_deleted, 0)
 
+            # create evaluation datasets
+            eval_idx = np.random.choice(len(self.d_data) - 1,
+                                        int(np.round(config.eval_split_fraction * len(self.d_data))))
+            train_idx = [x for x in range(len(self.d_data) - 1) if x not in eval_idx]
+
+            s_train = self.s_data[train_idx]
+            s_eval = self.s_data[eval_idx]
+            d_train = self.d_data[train_idx]
+            d_eval = self.d_data[eval_idx]
+            labels_train = self.labels[train_idx]
+            labels_eval = self.labels[eval_idx]
+
+            self.s_data = s_train
+            self.d_data = d_train
+            self.labels = labels_train
+
+            self.s_data_eval = s_eval
+            self.d_data_eval = d_eval
+            self.labels_eval = labels_eval
+
             # save numpy arrays as .h5 if config.save is true
             if self.config.save:
                 with h5py.File('{}.h5'.format(self.config.s_data_filename), 'w') as hf:
@@ -62,6 +82,13 @@ class DIRNetDatahandler(object):
                     hf.create_dataset(self.config.d_data_filename, data=self.d_data)
                 with h5py.File('{}.h5'.format(self.config.label_filename), 'w') as hf:
                     hf.create_dataset(self.config.label_filename, data=self.labels)
+
+                with h5py.File('{}.h5'.format(self.config.s_data_eval_filename), 'w') as hf:
+                    hf.create_dataset(self.config.s_data_eval_filename, data=self.s_data_eval)
+                with h5py.File('{}.h5'.format(self.config.d_data_eval_filename), 'w') as hf:
+                    hf.create_dataset(self.config.d_data_eval_filename, data=self.d_data_eval)
+                with h5py.File('{}.h5'.format(self.config.label_eval_filename), 'w') as hf:
+                    hf.create_dataset(self.config.label_eval_filename, data=self.labels_eval)
         else:
 
             # load numpy arrays from .h5 files
@@ -87,6 +114,21 @@ class DIRNetDatahandler(object):
             with h5py.File(self.config.label_filename + '.h5', 'r') as hf:
                 for (path, dset) in h5py_dataset_iterator(hf):
                     self.labels = hf[dset.name][:]
+
+            # load s_data
+            with h5py.File(self.config.s_data_eval_filename + '.h5', 'r') as hf:
+                for (path, dset) in h5py_dataset_iterator(hf):
+                    self.s_data_eval = hf[dset.name][:]
+
+            # load d_data
+            with h5py.File(self.config.d_data_eval_filename + '.h5', 'r') as hf:
+                for (path, dset) in h5py_dataset_iterator(hf):
+                    self.d_data_eval = hf[dset.name][:]
+
+            with h5py.File(self.config.label_eval_filename + '.h5', 'r') as hf:
+                for (path, dset) in h5py_dataset_iterator(hf):
+                    self.labels_eval = hf[dset.name][:]
+
 
     def load_labels(self, path):
         """
@@ -186,6 +228,7 @@ class DIRNetDatahandler(object):
 
         return x, y, labels
 
+
     def get_pair_by_idx(self, idx, batch_size=1):
         '''
         sample a batch of pairs of moving and fixed images and label, starting by the pair at the index.
@@ -197,5 +240,20 @@ class DIRNetDatahandler(object):
         x = self.s_data[np.expand_dims(idx, 0)]
         y = self.d_data[np.expand_dims(idx, 0)]
         labels = self.labels[np.expand_dims(idx, 0)]
+        # :TODO: adjust for batchsize other than 1
+        return x, y, labels
+
+
+    def get_eval_pair_by_idx(self, idx, batch_size=1):
+        '''
+        sample a batch of pairs of moving and fixed images and label, starting by the pair at the index.
+        If index+batch_size is not a valid index, the missing ones are sampled starting at index 0
+        :param batch_size: number of moving/fixed images images to be retrieved
+        :param idx: index in the data from where the samples should be retrived.
+        return: numpy arrays x and y with shape [batch_size, height, width,color_channels] and numpy array with all labels
+        '''
+        x = self.s_data_eval[np.expand_dims(idx, 0)]
+        y = self.d_data_eval[np.expand_dims(idx, 0)]
+        labels = self.labels_eval[np.expand_dims(idx, 0)]
         # :TODO: adjust for batchsize other than 1
         return x, y, labels

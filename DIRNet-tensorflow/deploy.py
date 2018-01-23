@@ -19,11 +19,18 @@ def main():
 
     # print(reg.calc_rmse_all(dh.s_data, dh.d_data, config.result_dir + "/",save_images=False))
     batch_x, batch_y, batch_labels = dh.sample_pair(config.batch_size)
+    # prediction = reg.deploy_with_labels(batch_x, batch_y, batch_labels)
+    # print(str(prediction))
 
     amnt_pics = np.shape(dh.d_data)[0]
     acc = 0
-    for i in range(amnt_pics):
-        batch_x, batch_y, batch_labels = dh.get_pair_by_idx(i)
+    prev_x = np.empty(shape=(1, 222, 247))
+    amnt_eva = np.shape(dh.d_data_eval)[0]
+    for i in range(amnt_eva):
+        batch_x, batch_y, batch_labels = dh.get_eval_pair_by_idx(i)
+        if np.array_equal(prev_x, batch_x):
+            print('weird')
+        prev_x = batch_x
         # loss = reg.fit((1, batch_x[0], batch_x[1], batch_x[2]),
         #                (1, batch_y[0], batch_y[1], batch_y[2]))
         prediction = reg.deploy_with_labels(batch_x, batch_y, batch_labels)
@@ -31,7 +38,7 @@ def main():
         # print("pred {} truth {}".format(prediction, truth))
         if prediction == truth:
             acc += 1
-    print("Acc: {0:.4f}".format( acc / amnt_pics))
+    print("Acc: {0:.4f}".format( acc / amnt_eva))
     # to use the deploy func from models
 
     # for i in range(10):
