@@ -51,19 +51,19 @@ class Disease_Classifier(object):
         # classifier network
         # TODO: think of of reasonable network architecture
         with tf.variable_scope(self.name, reuse=self.reuse):
-            x = conv2d(x, "conv1", 64, 3, 1,
-                       "SAME", True, tf.nn.elu, self.is_train)
-            x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-
-            x = conv2d(x, "conv2", 128, 3, 1,
-                       "SAME", True, tf.nn.elu, self.is_train)
-            x = conv2d(x, "out1", 128, 3, 1,
-                       "SAME", True, tf.nn.elu, self.is_train)
-            x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            x = conv2d(x, "out2", 2, 3, 1,
-                       "SAME", False, None, self.is_train)
-            x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            # reshape to [batchsize,features_count]
+            # x = conv2d(x, "conv1", 64, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            #
+            # x = conv2d(x, "conv2", 128, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = conv2d(x, "out1", 128, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            # x = conv2d(x, "out2", 2, 3, 1,
+            #            "SAME", False, None, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            # # reshape to [batchsize,features_count]
             x = tf.reshape(x, [-1, 31 * 28 * 2])
             
             # dense layer for classification
@@ -108,11 +108,6 @@ class DIRNet(object):
         self.vCNN = CNN("vector_CNN", is_train=self.is_train)
         self.ClassifierNetwork = Disease_Classifier("disease_classifier", is_train=self.is_train)
 
-        # calc disease features
-        self.d_features = self.ClassifierNetwork(self.xy)
-        # create predictions => filter highest likelyhood from logits
-        self.prediction = tf.argmax(self.d_features, 1)
-
         # calc v => featuremap from the localisation network
         self.v = self.vCNN(self.xy)
         self.z = None
@@ -122,6 +117,13 @@ class DIRNet(object):
             # warp using deformable transformation
             # z contains the warped image
             self.z = WarpST(self.x, self.v, config.im_size)
+
+        # y and z concatenated in color channel
+        self.yz = tf.concat([self.z, self.y], 3)
+        # calc disease features
+        self.d_features = self.ClassifierNetwork(self.v)
+        # create predictions => filter highest likelyhood from logits
+        self.prediction = tf.argmax(self.d_features, 1)
 
         if self.is_train:
             # loss definition and weighting of the 2 loss functions
@@ -261,7 +263,9 @@ class DIRNet(object):
             scipy.misc.imsave(dir_path + "/{:02d}_z-y.tif".format(i + 1), array[:, :])
 
     def save(self, dir_path):
-        self.ClassifierNetwork.save(self.sess, dir_path + "/model.ckpt")
+        self.ClassifierNetwork.save(self.sess, dir_path + "/model_class.ckpt")
+        self.vCNN.save(self.sess, dir_path + "/model_reg.ckpt")
 
     def restore(self, dir_path):
-        self.ClassifierNetwork.restore(self.sess, dir_path + "/model.ckpt")
+        self.ClassifierNetwork.restore(self.sess, dir_path + "/model_class.ckpt")
+        self.vCNN.restore(self.sess, dir_path + "/model_reg.ckpt")
