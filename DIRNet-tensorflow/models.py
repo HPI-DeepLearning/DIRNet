@@ -1,4 +1,5 @@
 import tensorflow as tf
+import Resnet_model
 from WarpST import WarpST
 from AffineST import AffineST
 from ops import *
@@ -14,16 +15,23 @@ class CNN(object):
     def __call__(self, x):
         # localisation network
         with tf.variable_scope(self.name, reuse=self.reuse):
-            x = conv2d(x, "conv1", 64, 3, 1,
+            x = conv2d(x, "conv1", 512, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
 
-            x = conv2d(x, "conv2", 128, 3, 1,
+            x = conv2d(x, "conv2", 256, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
-            x = conv2d(x, "out1", 128, 3, 1,
+            x = conv2d(x, "conv3", 128, 3, 1,
+                       "SAME", True, tf.nn.elu, self.is_train)
+            x = conv2d(x, "conv4", 128, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            x = conv2d(x, "out2", 2, 3, 1,
+            x = conv2d(x, "conv5", 64, 3, 1,
+                       "SAME", False, tf.nn.elu, self.is_train)
+            x = conv2d(x, "conv6", 32, 3, 1,
+                       "SAME", False, tf.nn.elu, self.is_train)
+            x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            x = conv2d(x, "out", 2, 3, 1,
                        "SAME", False, None, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
 
@@ -32,6 +40,9 @@ class CNN(object):
                 tf.GraphKeys.GLOBAL_VARIABLES, scope=self.name)
             self.saver = tf.train.Saver(self.var_list)
             self.reuse = True
+        # resnetmodel = Resnet_model.imagenet_resnet_v2(18, 5, use_as_loc=True, data_format=None)
+        # with tf.variable_scope(self.name, reuse=self.reuse):
+        #     x = resnetmodel(x, self.is_train)
         return x
 
     def save(self, sess, ckpt_path):
@@ -63,11 +74,13 @@ class Disease_Classifier(object):
             # x = conv2d(x, "out2", 2, 3, 1,
             #            "SAME", False, None, self.is_train)
             # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            # # reshape to [batchsize,features_count]
-            x = tf.reshape(x, [-1, 31 * 28 * 2])
-            
+            # # # reshape to [batchsize,features_count]
+            print(x.shape)
+            x = tf.reshape(x,[-1, 14*16*2])
+            # x = tf.reshape(x, [-1, 31 * 28 * 2])
+            print(x.shape)
             # dense layer for classification
-            x = tf.layers.dense(x, units=1024, activation=tf.nn.sigmoid)
+            x = tf.layers.dense(x, units=512, activation=tf.nn.sigmoid)
 
             # dropout = tf.layers.dropout(
             #     inputs=x, rate=0.4)
@@ -122,6 +135,7 @@ class DIRNet(object):
         self.yz = tf.concat([self.z, self.y], 3)
         # calc disease features
         self.d_features = self.ClassifierNetwork(self.v)
+        # self.d_features = self.ClassifierNetwork(self.yz)
         # create predictions => filter highest likelyhood from logits
         self.prediction = tf.argmax(self.d_features, 1)
 
@@ -185,7 +199,7 @@ class DIRNet(object):
         rmse_original_res = 0
         rmse_registered_res = 0
         counter = 1
-        print(x.shape)
+        # print(x.shape)
         for i in range(x.shape[0]):
 
             # calc transformed image
@@ -213,7 +227,9 @@ class DIRNet(object):
                 scipy.misc.imsave(dir_path + "/{:02d}_x.tif".format(i + 1), x[i, :, :, 0])
                 scipy.misc.imsave(dir_path + "/{:02d}_y.tif".format(i + 1), y[i, :, :, 0])
                 scipy.misc.imsave(dir_path + "/{:02d}_z.tif".format(i + 1), z[0, :, :, 0])
-        return (rmse_original_res / counter), (rmse_registered_res / counter)
+        (a, b) = ((rmse_original_res / counter), (rmse_registered_res / counter))
+        # print(" orig rmse {0}, registered rmse {1}".format(a,b))
+        return b
 
     def deploy_with_labels(self, x, y, labels):
         """
