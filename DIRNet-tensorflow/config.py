@@ -5,7 +5,7 @@ def get_config(is_train):
   config = Config()
   config.os_is_windows = False
   if is_train:
-    config.use_saved_data = True
+    config.use_saved_data = False
     config.batch_size = 1
     config.im_size = [222, 247]
     config.lr = 1e-4
@@ -19,7 +19,7 @@ def get_config(is_train):
     config.s_data_eval_filename="./s_data_eval_save"
     config.d_data_eval_filename="./d_data_eval_save"
     config.label_eval_filename="./label_eval_save"
-    config.save=False
+    config.save=True
     config.tmp_dir = "tmp"
     config.ckpt_dir = "ckpt"
     config.use_AffineST=False
