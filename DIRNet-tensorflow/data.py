@@ -9,6 +9,7 @@ import scipy.misc
 from config import get_config
 import random
 import h5py
+import random
 
 
 class DIRNetDatahandler(object):
@@ -55,10 +56,34 @@ class DIRNetDatahandler(object):
             self.d_data = np.delete(self.d_data, to_be_deleted, 0)
 
             # create evaluation datasets
-            eval_idx = np.random.choice(len(self.d_data) - 1,
-                                        int(np.round(config.eval_split_fraction * len(self.d_data))))
-            train_idx = [x for x in range(len(self.d_data) - 1) if x not in eval_idx]
+            # eval_idx = np.random.choice(len(self.d_data) - 1,
+            #                             int(np.round(config.eval_split_fraction * len(self.d_data))))
+            # train_idx = [x for x in range(len(self.d_data) - 1) if x not in eval_idx]
 
+            # There are 20 patients for each of the 5 disease classes
+            # we want to get so many patients for eval from each class
+            amnt_pat_for_eval = int(np.round(config.eval_split_fraction * 20))
+            eval_patients_ids = np.empty((5, amnt_pat_for_eval)) # stores the indices for the evaluation date for each disease
+            # eval_idx = np.empty(config.eval_split_fraction * len(self.d_data))
+            # train_idx = np.empty((1-config.eval_split_fraction) * len(self.d_data))
+            eval_idx = []
+            train_idx = []
+            for i in range(5):
+                eval_patients_ids[i] =random.sample(range(1,20), amnt_pat_for_eval)
+                # print(eval_patients_ids[i])
+            for i in range(len(self.s_data)-1):
+                # label_names, labels_raw
+                image_name = label_names[i]
+                num = image_name.split("_")[0][-3:]
+                pat_id = num.lstrip("0")
+                pat_label = int(labels_raw[i])
+                # if this patient
+                if (int(pat_id)%20)+1 in eval_patients_ids[pat_label]:
+                    eval_idx.append(i)
+                else:
+                    train_idx.append(i)
+            print('eval pairs size ' + str(len(eval_idx)))
+            print('train pairs size ' + str(len(train_idx)))
             s_train = self.s_data[train_idx]
             s_eval = self.s_data[eval_idx]
             d_train = self.d_data[train_idx]
@@ -66,6 +91,16 @@ class DIRNetDatahandler(object):
             labels_train = self.labels[train_idx]
             labels_eval = self.labels[eval_idx]
 
+            a = [0, 0, 0, 0, 0]
+            for i in labels_eval:
+                a[int(i)] += 1
+            print('distribution of labels in eval set:')
+            print(a)
+            b = [0, 0, 0, 0, 0]
+            for i in labels_train:
+                b[int(i)] += 1
+            print('distribution of labels in train set:')
+            print(b)
             self.s_data = s_train
             self.d_data = d_train
             self.labels = labels_train
@@ -148,7 +183,7 @@ class DIRNetDatahandler(object):
                     line = line.split(',')
                     slice_number = line[0].split('.')
                     slice_number = slice_number[len(slice_number) - 2]
-                    print((line[0].split(".")[0].split('_')[0]) + "_" + slice_number)
+                    # print((line[0].split(".")[0].split('_')[0]) + "_" + slice_number)
                     pathnames.append((line[0].split(".")[0].split('_')[0]) + "_" + slice_number)
                     labels.append(line[1])
             return pathnames, labels
@@ -187,14 +222,14 @@ class DIRNetDatahandler(object):
             slice_number = str(image_path).split(".")
             slice_number = slice_number[len(slice_number) - 2]
             if str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[0].startswith("nz"):
-                print(str(image_path).split(".")[len(slice_number) - 6].split(splitchar)[-1].split('_')[
-                          0] + "_" + slice_number)
+                # print(str(image_path).split(".")[len(slice_number) - 6].split(splitchar)[-1].split('_')[
+                #           0] + "_" + slice_number)
                 pathnames.append(
                     str(image_path).split(".")[len(slice_number) - 6].split(splitchar)[-1].split('_')[
                         0] + "_" + slice_number)
             else:
-                print(str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[
-                          0] + "_" + slice_number)
+                # print(str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[
+                #           0] + "_" + slice_number)
                 pathnames.append(
                     str(image_path).split(".")[len(slice_number) - 5].split(splitchar)[-1].split('_')[
                         0] + "_" + slice_number)
