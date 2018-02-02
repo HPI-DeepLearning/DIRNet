@@ -1,5 +1,5 @@
 import tensorflow as tf
-import Resnet_model
+from Resnet_model import imagenet_resnet_v2
 from WarpST import WarpST
 from AffineST import AffineST
 from ops import *
@@ -101,7 +101,73 @@ class Disease_Classifier(object):
     def restore(self, sess, ckpt_path):
         self.saver.restore(sess, ckpt_path)
 
+class ResNet(object):
+    def __init__(self, sess, config, name, is_train):
+        self.sess = sess
+        self.name = name
+        self.is_train = is_train
 
+        # image shape for grayscale images
+        im_shape = [config.batch_size] + config.im_size + [1]
+        # x => moving image
+        self.x = tf.placeholder(tf.float32, im_shape)
+        # y => fixed image
+        self.y = tf.placeholder(tf.float32, im_shape)
+        self.labels = tf.placeholder(tf.int32, [config.batch_size])
+        # x and y concatenated in color channel
+        self.xy = tf.concat([self.x, self.y], 3)
+
+        self.vCNN = CNN("vector_CNN", is_train=self.is_train)
+        self.ClassifierNetwork = Disease_Classifier("disease_classifier", is_train=self.is_train)
+
+        self.model=imagenet_resnet_v2(34,5,data_format='channels_first')
+        self.logits = self.model(self.x,is_training=True)
+
+        # create predictions => filter highest likelyhood from logits
+        self.prediction = tf.argmax(self.logits, 1)
+        self.var_list = tf.get_collection(
+            tf.GraphKeys.GLOBAL_VARIABLES)
+        self.saver = tf.train.Saver(self.var_list)
+
+        if self.is_train:
+            # loss definition and weighting of the 2 loss functions
+            self.loss = - self.disease_loss(self.labels, self.logits)
+            # self.loss = mse(self.y, self.z)
+
+            self.optim = tf.train.AdamOptimizer(config.lr)
+            self.train = self.optim.minimize(
+                - self.loss)
+
+        # self.sess.run(
+        #  tf.variables_initializer(self.vCNN.var_list))
+        self.sess.run(tf.global_variables_initializer())
+
+    def save(self, dir_path):
+        self.saver.save(self.sess, dir_path + "/model_class.ckpt")
+
+    def restore(self, dir_path):
+        self.saver.restore(self.sess, dir_path + "/model_reg.ckpt")
+
+    def fit(self, batch_x, batch_y, batch_labels):
+        _, loss, pred = \
+            self.sess.run([self.train, self.loss, self.prediction],
+                          {self.x: batch_x, self.y: batch_y, self.labels: batch_labels})
+        return loss, pred
+
+    def disease_loss(self, labels, logits):
+        """
+        :param labels: batch of labels
+        :type labels: numpy array of dim-1
+        :param logits: logits from classifier network
+        :type logits: logits
+        :return: softmax_cross_entropy loss
+        :rtype: scalar tensor
+        """
+        # transform to one_hot vector and calc softmax_cross_entropy
+        onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=5)
+        loss = tf.losses.softmax_cross_entropy(
+            onehot_labels=onehot_labels, logits=logits)
+        return loss
 class DIRNet(object):
     def __init__(self, sess, config, name, is_train):
         self.sess = sess
