@@ -15,23 +15,35 @@ class CNN(object):
     def __call__(self, x):
         # localisation network
         with tf.variable_scope(self.name, reuse=self.reuse):
-            x = conv2d(x, "conv1", 512, 3, 1,
+            # x = conv2d(x, "conv1", 512, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            #
+            # x = conv2d(x, "conv2", 256, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = conv2d(x, "conv3", 128, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = conv2d(x, "conv4", 128, 3, 1,
+            #            "SAME", True, tf.nn.elu, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            # x = conv2d(x, "conv5", 64, 3, 1,
+            #            "SAME", False, tf.nn.elu, self.is_train)
+            # x = conv2d(x, "conv6", 32, 3, 1,
+            #            "SAME", False, tf.nn.elu, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            # x = conv2d(x, "out", 2, 3, 1,
+            #            "SAME", False, None, self.is_train)
+            # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+            x = conv2d(x, "conv1", 64, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
 
-            x = conv2d(x, "conv2", 256, 3, 1,
+            x = conv2d(x, "conv2", 128, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
-            x = conv2d(x, "conv3", 128, 3, 1,
-                       "SAME", True, tf.nn.elu, self.is_train)
-            x = conv2d(x, "conv4", 128, 3, 1,
+            x = conv2d(x, "out1", 128, 3, 1,
                        "SAME", True, tf.nn.elu, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            x = conv2d(x, "conv5", 64, 3, 1,
-                       "SAME", False, tf.nn.elu, self.is_train)
-            x = conv2d(x, "conv6", 32, 3, 1,
-                       "SAME", False, tf.nn.elu, self.is_train)
-            x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
-            x = conv2d(x, "out", 2, 3, 1,
+            x = conv2d(x, "out2", 2, 3, 1,
                        "SAME", False, None, self.is_train)
             x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
 
@@ -76,8 +88,8 @@ class Disease_Classifier(object):
             # x = tf.nn.avg_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
             # # # reshape to [batchsize,features_count]
             print(x.shape)
-            x = tf.reshape(x,[-1, 14*16*2])
-            # x = tf.reshape(x, [-1, 31 * 28 * 2])
+            # x = tf.reshape(x, [-1, 14 * 16 * 2])
+            x = tf.reshape(x, [-1, 31 * 28 * 2])
             print(x.shape)
             # dense layer for classification
             x = tf.layers.dense(x, units=512, activation=tf.nn.sigmoid)
@@ -101,6 +113,7 @@ class Disease_Classifier(object):
     def restore(self, sess, ckpt_path):
         self.saver.restore(sess, ckpt_path)
 
+
 class ResNet(object):
     def __init__(self, sess, config, name, is_train):
         self.sess = sess
@@ -117,11 +130,8 @@ class ResNet(object):
         # x and y concatenated in color channel
         self.xy = tf.concat([self.x, self.y], 3)
 
-        self.vCNN = CNN("vector_CNN", is_train=self.is_train)
-        self.ClassifierNetwork = Disease_Classifier("disease_classifier", is_train=self.is_train)
-
-        self.model=imagenet_resnet_v2(34,5,data_format='channels_first')
-        self.logits = self.model(self.x,is_training=True)
+        self.model = imagenet_resnet_v2(18, 5, data_format='channels_first')
+        self.logits = self.model(self.xy, is_training=True)
 
         # create predictions => filter highest likelyhood from logits
         self.prediction = tf.argmax(self.logits, 1)
@@ -146,7 +156,7 @@ class ResNet(object):
         self.saver.save(self.sess, dir_path + "/model_class.ckpt")
 
     def restore(self, dir_path):
-        self.saver.restore(self.sess, dir_path + "/model_reg.ckpt")
+        self.saver.restore(self.sess, dir_path + "/model_class.ckpt")
 
     def fit(self, batch_x, batch_y, batch_labels):
         _, loss, pred = \
@@ -168,6 +178,24 @@ class ResNet(object):
         loss = tf.losses.softmax_cross_entropy(
             onehot_labels=onehot_labels, logits=logits)
         return loss
+
+    def deploy_with_labels(self, x, y, labels):
+        """
+        :param x: batch of moving images
+        :type x: numpy array [batch_size,height,width,color_channels]
+        :param y: batch of fixed images
+        :type y: numpy array [batch_size,height,width,color_channels]
+        :param labels: corresponding labels
+        :type labels: numpy array [batch_size]
+        """
+        pred = self.sess.run([self.prediction], {self.x: x, self.y: y})
+        # print(z[0])
+        pred = int(pred[0])
+        # for i in range(labels.shape[0]):
+        #     print("label: ", labels[i], "prediction: ", pred)
+        return pred
+
+
 class DIRNet(object):
     def __init__(self, sess, config, name, is_train):
         self.sess = sess
