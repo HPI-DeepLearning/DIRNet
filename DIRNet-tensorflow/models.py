@@ -131,7 +131,7 @@ class ResNet(object):
         self.xy = tf.concat([self.x, self.y], 3)
 
         self.model = imagenet_resnet_v2(18, 5, data_format='channels_first')
-        self.logits = self.model(self.xy, is_training=True)
+        self.logits = self.model(self.x, is_training=True)
 
         # create predictions => filter highest likelyhood from logits
         self.prediction = tf.argmax(self.logits, 1)
